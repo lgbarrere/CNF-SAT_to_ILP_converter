@@ -1,36 +1,43 @@
 #! /usr/bin/env python3
 # coding: utf8
 
-# File : converter.py
-# Author : lgbarrere
-# Purpose : To convert a CNF-SAT formula into its ILP version
-
+"""
+File : converter.py
+Author : lgbarrere
+Brief : To convert a CNF-SAT formula into its ILP version
+"""
 
 
 from os import path
 import logging as lg
+from ast import literal_eval
 
 
 class Converter:
+    """
+    Brief : Allows to convert a CNF-SAT into an ILP instance
+    with a given file name or CNF string
+    """
     def __init__(self):
-        self.fileName = "" # Name of the CNF-SAT file
+        self.file_name = "" # Name of the CNF-SAT file
         self.__converted = False # Convertion applied or not
         self.constraints = "" # ILP constraints
-        self.n = 0 # Number of variables
-        self.m = 0 # Number of clauses
-    
+        self.nb_variables = 0 # Number of variables
+        self.nb_clauses = 0 # Number of clauses
 
-    
-    # Brief : Transform the given DIMACS format lines into an ILP in string
-    # Return : NONE
-    # > lines : The lines from a DIMACS file format
-    def __formula_to_constraints(self, lines):
+
+    def _formula_to_constraints(self, lines):
+        """
+        Brief : Transform the given DIMACS format lines into an ILP in string
+        Return : None
+        > lines : The lines from a DIMACS file format
+        """
         self.constraints = ""
-        nbClauses = 1
+        nb_clauses = 1
 
-        if lines == None:
+        if lines is None:
             return
-        
+
         for line in lines:
             words = line.split()
             # Ignore DIMACS comments
@@ -40,18 +47,18 @@ class Converter:
                     i = 1
                     if words[i] == "cnf":
                         i += 1
-                    self.n = eval(words[i])
-                    self.m = eval(words[i+1])
+                    self.nb_variables = literal_eval(words[i])
+                    self.nb_clauses = literal_eval(words[i+1])
                 # Start writting the constraints
                 else:
-                    self.constraints += "C" + str(nbClauses) + " : "
+                    self.constraints += "C" + str(nb_clauses) + " : "
                     i = 0
                     while True:
                         # Get each variable as int (to know if it's positive)
-                        val = eval(words[i])
+                        val = literal_eval(words[i])
                         if val < 0:
                             # Respect the rule : "not(x) = 1 - x"
-                            self.constraints += "(1 - x" + str(-val) + ")"
+                            self.constraints += "(1 - x" + str(abs(val)) + ")"
                         elif val > 0:
                             self.constraints += "x" + words[i]
                         # This condition means the line ended, break the loop
@@ -62,65 +69,72 @@ class Converter:
                         if words[i+1] != "0":
                             self.constraints += " + "
                         i += 1
-                    nbClauses += 1
+                    nb_clauses += 1
         self.__converted = True
 
 
-
-    # Brief : Open a DIMACS file with its given name to get each line
-    # Return : Each line as an element of the returned list
-    # > fileName : The name of the file to open
-    def _read_dimacs_file(self, fileName):
-        self.fileName = fileName
+    def _read_dimacs_file(self, file_name):
+        """
+        Brief : Open a DIMACS file with its given name to get each line
+        Return : Each line as an element of the returned list
+        > fileName : The name of the file to open
+        """
+        self.file_name = file_name
         directory = path.dirname(path.dirname(__file__))
-        pathToFile = path.join(directory, "data", fileName)
-        
+        path_to_file = path.join(directory, "data", file_name)
+
         try:
-            with open(pathToFile, "r") as file:
-                lg.debug("Reading file "+ fileName +"...")
+            with open(path_to_file, "r") as file:
+                lg.debug("Reading file %s...", file_name)
                 lines = file.readlines()
                 return lines
-        except FileNotFoundError as e:
-            lg.critical("The file was not found. {}".format(e))
+        except FileNotFoundError as error:
+            lg.critical("The file was not found. %s", error)
+        return None
 
 
-
-    # Brief : Check if the conveter has already applied a convertion
-    # Return : True is a convertion has been done, False otherwise
     def is_converted(self):
+        """
+        Brief : Check if the conveter has already applied a convertion
+        Return : True is a convertion has been done, False otherwise
+        """
         if self.__converted:
             return True
         return False
-    
 
 
-    # Brief : Print the converted formula from CNF-SAT into ILP
-    # Return : None
-    def print_ILP(self):
+    def print_ilp(self):
+        """
+        Brief : Print the converted formula from CNF-SAT into ILP
+        Return : None
+        """
         if self.is_converted():
             print("Constraints : \n" + self.constraints)
         else:
             lg.warning("No CNF-SAT has been converted into ILP by this converter so far.\n")
 
 
-
-    # Brief : Convert a CNF-SAT formula into ILP from the given fileName
-    # Return : None
-    # > fileName : The name of the file to open
-    def convert_from_file(self, fileName):
-        lines = self._read_dimacs_file(fileName)
-        self.__formula_to_constraints(lines)
-
+    def convert_from_file(self, file_name):
+        """
+        Brief : Convert a CNF-SAT formula into ILP from the given fileName
+        Return : None
+        > fileName : The name of the file to open
+        """
+        lines = self._read_dimacs_file(file_name)
+        self._formula_to_constraints(lines)
 
 
 def main():
+    """
+    Brief : Test some uses of this library
+    Return : None
+    """
     lg.basicConfig(level=lg.DEBUG)
     converter = Converter()
     converter.convert_from_file("test.cnf")
-    converter.print_ILP()
+    converter.print_ilp()
+    print("n = " + str(converter.nb_variables) + " m = " + str(converter.nb_clauses))
 
 
-    
 if __name__ == "__main__":
     main()
-    
