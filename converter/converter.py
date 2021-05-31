@@ -57,7 +57,7 @@ class Converter:
                     self.nb_clauses = literal_eval(words[i+1])
 
                     # Set the CNF-SAT variables to maximize and as binaries
-                    self.__maximize += "  "
+                    self.__maximize += "  Obj: "
                     self.__binary += "  "
                     for i in range(1, self.nb_variables+1):
                         self.__maximize += self.__prefix + str(i)
