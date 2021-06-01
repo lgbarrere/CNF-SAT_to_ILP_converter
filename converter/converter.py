@@ -69,24 +69,23 @@ class Converter:
                     self.__binary += "\n"
                 # Start writting the constraints
                 else:
-                    self.__constraints += "  C" + str(nb_clauses) + " : "
+                    self.__constraints += "  C" + str(nb_clauses) + ": "
                     i = 0
                     while True:
                         # Get each variable as int (to know if it's positive)
                         val = literal_eval(words[i])
                         if val < 0:
-                            # Respect the rule : "not(x) = 1 - x"
-                            self.__constraints += "(1 - " + self.__prefix + \
-                                                str(abs(val)) + ")"
+                            # Respect the rule : not(0) = 1 and not(1) = 0
+                            self.__constraints += "- " + self.__prefix + \
+                                                    str(abs(val)) + " "
                         elif val > 0:
-                            self.__constraints += self.__prefix + words[i]
+                            if i > 0:
+                                self.__constraints += "+ "
+                            self.__constraints += self.__prefix + words[i] + " "
                         # This condition means the line ended, break the loop
                         else:
-                            self.__constraints += " >= 1\n"
+                            self.__constraints += ">= 1\n"
                             break
-                        # if the line is not ended, add "+" in the constraint
-                        if words[i+1] != "0":
-                            self.__constraints += " + "
                         i += 1
                     nb_clauses += 1
         self.__converted = True
@@ -177,7 +176,7 @@ def main():
     lg.basicConfig(level=lg.DEBUG)
     converter = Converter()
     converter.convert_from_file("test.cnf")
-    converter.save_ilp_in_file("test.ilp")
+    converter.save_ilp_in_file("test.lpt")
     converter.print_ilp()
     print("n = " + str(converter.nb_variables) + " m = " + str(converter.nb_clauses))
 
