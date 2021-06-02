@@ -1,0 +1,5 @@
+c mistake_nb_variables.cnf
+c
+p cnf 3 2
+1 -2 3 0
+-1 3 4 0
