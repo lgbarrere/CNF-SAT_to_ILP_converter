@@ -128,5 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Example folders
+# Example folders and archives
 saves/
+data/dimacs
+data/dimacs.zip

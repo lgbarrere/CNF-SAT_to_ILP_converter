@@ -25,7 +25,7 @@ class Converter:
     __SAVE_FOLDER_NAME = "saves" # Folder in which to save the converted files
     __PREFIX = "z" # Prefix of converted variables
     __INVERTER = "_1" # Name of the constant set to 1, to invert a binary value
-    __OBJECTIVE = "Maximize\n  Obj:\n" # CNF-SAT formula
+    __OBJECTIVE = "Maximize\n  Obj: _1\n" # CNF-SAT formula
     __BOUND = "Bounds\n  1 <= " + __INVERTER + " <= 1\n" # Bound of inverter
 
     def __init__(self):
@@ -65,12 +65,9 @@ class Converter:
                 self.nb_clauses = literal_eval(words[i + 1])
 
                 # Set the CNF-SAT variables to maximize and as binaries
-                self.__binary += "  "
                 for i in range(1, self.nb_variables + 1):
-                    self.__binary += self.__PREFIX + str(i)
-                    if i < self.nb_variables:
-                        self.__binary += " "
-                self.__binary += "\n"
+                    self.__binary += "  " + self.__PREFIX + str(i) + "\n"
+
             # Start writting the constraints
             else:
                 self.__constraints += "  C" + str(nb_clauses) + ": "
@@ -94,7 +91,7 @@ class Converter:
         self.__converted = True
 
 
-    def _read_dimacs_file(self, file_name):
+    def _read_dimacs_file(self, file_name, optionnal_dir = None):
         """
         Brief : Open a DIMACS file with its given name to get each line
         Return : Each line as an element of the returned list
@@ -103,7 +100,11 @@ class Converter:
         lg.debug("Reading file %s...", file_name)
         self.file_name = file_name
         directory = path.dirname(path.dirname(__file__))
-        path_to_file = path.join(directory, self.__DATA_FOLDER_NAME, file_name)
+
+        if optionnal_dir is None:
+            path_to_file = path.join(directory, self.__DATA_FOLDER_NAME, file_name)
+        else:
+            path_to_file = path.join(directory, self.__DATA_FOLDER_NAME, optionnal_dir, file_name)
 
         try:
             with open(path_to_file, "r") as file:
@@ -164,13 +165,13 @@ class Converter:
         lg.debug("Saving done !")
 
 
-    def convert_from_file(self, file_name):
+    def convert_from_file(self, file_name, optionnal_dir = None):
         """
         Brief : Convert a CNF-SAT formula into ILP from the given file_name
         Return : None
         > file_name : The name of the file to open
         """
-        lines = self._read_dimacs_file(file_name)
+        lines = self._read_dimacs_file(file_name, optionnal_dir)
         self._formula_to_constraints(lines)
 
 
@@ -192,8 +193,9 @@ class Converter:
             if isfile(path_to_file):
                 try:
                     with open(path_to_file, "r"):
-                        self.convert_from_file(file_name)
-                        save_file_name = file_name.replace(".cnf", ".lpt")
+                        self.convert_from_file(file_name, folder_name)
+                        #save_file_name = file_name.replace(".cnf", ".lpt")
+                        save_file_name = file_name.replace(".txt", ".lpt")
                         self.save_ilp_in_file(save_file_name)
                 except FileNotFoundError as error:
                     lg.critical("The file was not found. %s", error)
@@ -230,7 +232,7 @@ def main():
     lg.basicConfig(level=lg.DEBUG)
     converter = Converter()
     converter.clear_save_folder()
-    converter.convert_from_folder()
+    converter.convert_from_folder("dimacs")
     converter.convert_from_file("test.cnf")
     converter.save_ilp_in_file("test.lpt")
     converter.print_ilp()
