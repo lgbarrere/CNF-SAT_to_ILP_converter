@@ -12,6 +12,7 @@ import os
 from os import path
 from os.path import isfile, join
 from os import listdir
+from pathlib import Path
 import logging as lg
 from ast import literal_eval
 
@@ -48,6 +49,8 @@ class Converter:
         self.__binary = "Binary\n"
         nb_clauses = 1
 
+        dico = {}
+
         if lines is None:
             return
 
@@ -64,30 +67,33 @@ class Converter:
                 self.nb_variables = literal_eval(words[i])
                 self.nb_clauses = literal_eval(words[i + 1])
 
-                # Set the CNF-SAT variables to maximize and as binaries
-                for i in range(1, self.nb_variables + 1):
-                    self.__binary += "  " + self.__PREFIX + str(i) + "\n"
-
             # Start writting the constraints
             else:
                 self.__constraints += "  C" + str(nb_clauses) + ": "
                 i = 0
                 val = literal_eval(words[i])
+                constraint_value = 1
                 while val != 0:
-                    if i > 0:
-                        self.__constraints += "+ "
+                    abs_val = abs(val)
+                    dico[abs_val] = self.__PREFIX + str(abs_val)
                     # Get each variable as int (to know if it's positive)
                     if val < 0:
                         # Respect the rule : not(0) = 1 and not(1) = 0
-                        self.__constraints += self.__INVERTER + " - " + \
+                        self.__constraints += "- " + \
                                               self.__PREFIX + \
-                                              str(abs(val)) + " "
+                                              str(abs_val) + " "
+                        constraint_value -= 1
                     elif val > 0:
+                        if i > 0:
+                            self.__constraints += "+ "
                         self.__constraints += self.__PREFIX + words[i] + " "
                     i += 1
                     val = literal_eval(words[i])
-                self.__constraints += ">= 1\n"
+                self.__constraints += ">= " + str(constraint_value) + "\n"
                 nb_clauses += 1
+        # Set the CNF-SAT variables as binaries
+        for i in dico.values():
+            self.__binary += "  " + i + "\n"
         self.__converted = True
 
 
@@ -97,7 +103,7 @@ class Converter:
         Return : Each line as an element of the returned list
         > file_name : The name of the file to open
         """
-        lg.debug("Reading file %s...", file_name)
+        lg.debug("Reading file %s.", file_name)
         self.file_name = file_name
         directory = path.dirname(path.dirname(__file__))
 
@@ -138,20 +144,29 @@ class Converter:
             lg.warning("No CNF-SAT has been converted into ILP so far.\n")
 
 
-    def save_ilp_in_file(self, file_name):
+    def save_ilp_in_file(self, file_name = None, optionnal_dir = None):
         """
         Brief : Save a converted ILP in a file (created if missing) with a name
         Return : None
-        > file_name : The name of the file to open
+        > file_name : The optionnal name of the file to open
+        > optionnal_dir : folder to save the file (created if missing)
+        Note : If no file name is given, save the last converted file
         """
         # If nothing has been converted earlier, don't save anything
         if not self.is_converted():
             lg.warning("Can't save a non-existent ILP.\n")
             return
+        # If no file name is given, use the last converted file instead
+        if file_name is None :
+            file_name = Path(self.file_name).with_suffix('.lpt')
 
-        lg.debug("Saving in file %s...", file_name)
+        lg.debug("Saving in file %s.", file_name)
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, self.__SAVE_FOLDER_NAME)
+        if optionnal_dir is not None:
+            path_to_folder = path.join(path_to_folder, optionnal_dir)
+        if not os.path.exists(path_to_folder):
+            os.mkdir(path_to_folder)
         path_to_file = path.join(path_to_folder, file_name)
 
         # Create folder and/or file if missing, then save the ILP
@@ -181,11 +196,14 @@ class Converter:
         Return : None
         > folder_name : The name of the folder to convert files from
         """
-        lg.debug("Converting all files in folder %s...", folder_name)
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, self.__DATA_FOLDER_NAME)
         if folder_name is not None:
             path_to_folder = path.join(path_to_folder, folder_name)
+            relative_data_path = self.__DATA_FOLDER_NAME + "/" + folder_name
+            lg.debug("Converting files in folder %s.", relative_data_path)
+        else:
+            lg.debug("Converting files in folder %s.", self.__DATA_FOLDER_NAME)
 
         for file_name in listdir(path_to_folder):
             self.file_name = file_name
@@ -194,9 +212,9 @@ class Converter:
                 try:
                     with open(path_to_file, "r"):
                         self.convert_from_file(file_name, folder_name)
-                        #save_file_name = file_name.replace(".cnf", ".lpt")
-                        save_file_name = file_name.replace(".txt", ".lpt")
-                        self.save_ilp_in_file(save_file_name)
+                        # replace the current extension by .lpt
+                        #save_file_name = Path(file_name).with_suffix('.lpt')
+                        self.save_ilp_in_file(optionnal_dir=folder_name)
                 except FileNotFoundError as error:
                     lg.critical("The file was not found. %s", error)
         lg.debug("Folder conversion done !")
@@ -208,12 +226,14 @@ class Converter:
         Return : None
         > folder_name : The name of the folder to clear
         """
-        lg.debug("Clearing folder %s...", folder_name)
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, self.__SAVE_FOLDER_NAME)
         if folder_name is not None:
             path_to_folder = path.join(path_to_folder, folder_name)
-
+            relative_data_path = self.__DATA_FOLDER_NAME + "/" + folder_name
+            lg.debug("Clearing folder %s.", relative_data_path)
+        else:
+            lg.debug("Clearing folder %s.", self.__DATA_FOLDER_NAME)
         for file_name in listdir(path_to_folder):
             path_to_file = join(path_to_folder, file_name)
             if isfile(path_to_file):
@@ -229,15 +249,22 @@ def main():
     Brief : Test some uses of this library
     Return : None
     """
+    # verbose debug and prepare the tests
     lg.basicConfig(level=lg.DEBUG)
+    test_folder_name = "dimacs"
     converter = Converter()
+    converter.clear_save_folder(test_folder_name)
     converter.clear_save_folder()
-    converter.convert_from_folder("dimacs")
+    
+    # test limits in example files
     converter.convert_from_file("test.cnf")
-    converter.save_ilp_in_file("test.lpt")
+    converter.save_ilp_in_file()
     converter.print_ilp()
     print("n = " + str(converter.nb_variables) + " m = " + str(converter.nb_clauses))
+    converter.convert_from_folder()
 
+    # test with important data folder
+    converter.convert_from_folder(test_folder_name)
 
 if __name__ == "__main__":
     main()
