@@ -6,8 +6,13 @@ File : application.py
 Author : lgbarrere
 Brief : Create a windowed User Interface for the converter
 """
+import os
+from os import path
+from os import listdir
 import tkinter as tk
+from tkinter import filedialog as fd
 from enum import Enum, auto
+import converter as conv
 
 
 class ColorTheme(Enum):
@@ -29,6 +34,7 @@ class Application:
 
     def __init__(self):
         # Window
+        self.converter = conv.Converter()
         self.widget_ref = {}
         window = tk.Tk()
         self.widget_ref["window"] = window
@@ -83,10 +89,14 @@ class Application:
         self.widget_ref["menu_bar"] = menu_bar
         # File menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Open file", command=function_todo)
-        file_menu.add_command(label="Open folder", command=function_todo)
+        file_menu.add_command(label="Select file", command=self.get_files)
+        file_menu.add_command(label="Select folder", command=self.get_folder)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.widget_ref["window"].destroy)
+        file_menu.add_command(label="Clear ILP folder",
+                              command=self.converter.clear_all_save_folder)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit",
+                              command=self.widget_ref["window"].destroy)
         menu_bar.add_cascade(label="File", menu=file_menu)
         # Theme menu
         theme_menu = tk.Menu(menu_bar, tearoff=0)
@@ -114,7 +124,7 @@ class Application:
         self.widget_ref["label_title"] = label_title
         # Tell which file or folder is selected
         label_selected = tk.Label(self.widget_ref["header_frame"],
-                                  text="File loaded",
+                                  text="Files loaded : 0",
                                   font=(self.__FONT_THEME, 16),
                                   bg=self.bg_color[0],
                                   fg=self.fg_color[0])
@@ -248,7 +258,6 @@ class Application:
             self.bg_color = [self.__ANTHRACITE, self.__LIGHT_GREY]
             self.fg_color = [self.__LIGHT_GREY, self.__ANTHRACITE]
         self.set_interface_colors()
-        self.widget_ref["window"].update()
 
 
     def set_interface_colors(self):
@@ -294,6 +303,39 @@ class Application:
                                          fg=self.fg_color[1])
 
 
+    def get_folder(self):
+        # choose a directory
+        directory = path.dirname(path.dirname(__file__))
+        path_to_folder = path.join(directory, "data")
+        folder = fd.askdirectory(parent=self.widget_ref["window"],
+                                 title="Choose a folder",
+                                 initialdir=path_to_folder)
+        text = "Files loaded : " + str(len(listdir(folder)))
+        self.widget_ref["label_selected"].config(text=text)
+        self.widget_ref["window"].update()
+        self.converter.convert_from_folder(folder)
+
+
+    def get_files(self):
+        filetypes = (
+        ("Text files", "*.txt"),
+        ("CNF text files", "*.cnf"),
+        ("All files", "*.*"))
+
+        # choose files
+        directory = path.dirname(path.dirname(__file__))
+        path_to_folder = path.join(directory, "data")
+        file_list = fd.askopenfilenames(parent=self.widget_ref["window"],
+                                        title="Choose files",
+                                        initialdir=path_to_folder)
+        text = "Files loaded : " + str(len(file_list))
+        self.widget_ref["label_selected"].config(text=text)
+        self.widget_ref["window"].update()
+        for file in file_list :
+            self.converter.convert_from_file(file)
+            self.converter.save_ilp_in_file()
+
+
 def function_todo():
     """
     Brief : Temporary void function, will be replaced by functions depending of
@@ -306,6 +348,3 @@ def function_todo():
 # processes
 app = Application()
 app.widget_ref["window"].mainloop()
-
-##    # choose a file
-##    tk.filedialog

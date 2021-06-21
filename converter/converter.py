@@ -12,9 +12,11 @@ import os
 from os import path
 from os.path import isfile, join
 from os import listdir
+import shutil
 from pathlib import Path
 import logging as lg
 from ast import literal_eval
+import time
 
 
 class Converter:
@@ -48,7 +50,7 @@ class Converter:
         nb_clauses = 1
 
         var_match = {}
-
+        t_debut = time.time()
         if lines is None:
             return
 
@@ -92,6 +94,8 @@ class Converter:
         for i in var_match.values():
             self.__binary += "  " + i + "\n"
         self.__converted = True
+        t_fin = time.time() - t_debut
+        print("execution time : " + str(t_fin))
 
 
     def _read_dimacs_file(self, file_name, optionnal_dir = None):
@@ -101,7 +105,7 @@ class Converter:
         > file_name : The name of the file to open
         """
         lg.debug("Reading file %s.", file_name)
-        self.file_name = file_name
+        self.file_name = path_tail(file_name)
         directory = path.dirname(path.dirname(__file__))
         path_to_file = path.join(directory, self.__DATA_FOLDER_NAME)
 
@@ -163,7 +167,6 @@ class Converter:
         if optionnal_dir is not None:
             path_to_folder = path.join(path_to_folder, optionnal_dir)
         path_to_file = path.join(path_to_folder, file_name)
-
         # Create folder and/or file if missing, then save the ILP
         os.makedirs(path_to_folder, exist_ok=True)
         with open(path_to_file, "w") as file:
@@ -193,6 +196,7 @@ class Converter:
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, self.__DATA_FOLDER_NAME)
         if folder_name is not None:
+            folder_name = path_tail(folder_name)
             path_to_folder = path.join(path_to_folder, folder_name)
             relative_data_path = self.__DATA_FOLDER_NAME + "/" + folder_name
             lg.debug("Converting files in folder %s.", relative_data_path)
@@ -230,12 +234,38 @@ class Converter:
             return
         for file_name in listdir(path_to_folder):
             path_to_file = join(path_to_folder, file_name)
-            if isfile(path_to_file):
-                try:
+            try:
+                if isfile(path_to_file):
                     os.remove(path_to_file)
-                except OSError as error:
-                    lg.critical("The file was not found. %s", error)
+            except OSError as error:
+                lg.critical("The file was not found. %s", error)
         lg.debug("Folder clearing done !")
+
+
+    def clear_all_save_folder(self):
+        """
+        Brief : Delete all files and folder in the save folder
+        Return : None
+        """
+        directory = path.dirname(path.dirname(__file__))
+        path_to_folder = path.join(directory, self.__SAVE_FOLDER_NAME)
+        lg.debug("Clearing folder %s.", path_to_folder)
+
+        for file_name in listdir(path_to_folder):
+            file_path = join(path_to_folder, file_name)
+            try:
+                if isfile(file_path):
+                    os.remove(file_path)
+                elif path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except OSError as error:
+                lg.critical("Failed to delete %s. %s", file_path, error)
+        lg.debug("Folder clearing done !")
+
+
+def path_tail(path_name):
+    head, tail = path.split(path_name)
+    return tail or path.basename(head)
 
 
 def main():
@@ -247,8 +277,7 @@ def main():
     lg.basicConfig(level=lg.DEBUG)
     test_folder_name = "dimacs"
     converter = Converter()
-    converter.clear_save_folder(test_folder_name)
-    converter.clear_save_folder()
+    converter.clear_all_save_folder()
     
     # test limits in example files
     converter.convert_from_file("test.cnf")
