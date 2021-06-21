@@ -15,8 +15,6 @@ from os import listdir
 import shutil
 from pathlib import Path
 import logging as lg
-from ast import literal_eval
-import time
 
 
 class Converter:
@@ -32,7 +30,7 @@ class Converter:
     def __init__(self):
         self.file_name = "" # Name of the CNF-SAT file
         self.__converted = False # Convertion applied or not
-        self.__constraints = "" # ILP constraints
+        self.__constraints = [] # ILP constraints
         self.__binary = "" # Specify each CNF-SAT variable as binary
         self.nb_variables = 0 # Number of variables
         self.nb_clauses = 0 # Number of clauses
@@ -45,12 +43,12 @@ class Converter:
         > lines : The lines from a DIMACS file format
         """
         self.__converted = False
-        self.__constraints = "Subject To\n"
+        self.__constraints = []
+        self.__constraints.append("Subject To\n")
         self.__binary = "Binary\n"
         nb_clauses = 1
 
         var_match = {}
-        t_debut = time.time()
         if lines is None:
             return
 
@@ -64,38 +62,37 @@ class Converter:
                 i = 1
                 if words[i] == "cnf":
                     i += 1
-                self.nb_variables = literal_eval(words[i])
-                self.nb_clauses = literal_eval(words[i + 1])
-
+                self.nb_variables = int(words[i])
+                self.nb_clauses = int(words[i + 1])
             # Start writting the constraints
             else:
-                self.__constraints += "  C" + str(nb_clauses) + ": "
+                constraint_line = f'  C{nb_clauses}: '
                 i = 0
-                val = literal_eval(words[i])
+                val = int(words[i])
                 constraint_value = 1
                 while val != 0:
-                    abs_val = abs(val)
-                    var_match[abs_val] = self.__PREFIX + str(abs_val)
                     # Get each variable as int (to know if it's positive)
                     if val < 0:
                         # Respect the rule : not(0) = 1 and not(1) = 0
-                        self.__constraints += "- " + var_match[abs_val] + " "
+                        abs_val = -val
+                        var_match[abs_val] = f'{self.__PREFIX}{abs_val}'
+                        constraint_line = f'{constraint_line}- {var_match[abs_val]} '
                         constraint_value -= 1
                     elif val > 0:
+                        var_match[val] = f'{self.__PREFIX}{val}'
                         if i > 0:
-                            self.__constraints += "+ "
-                        self.__constraints += var_match[abs_val] + " "
+                            constraint_line = f'{constraint_line}+ '
+                        constraint_line = f'{constraint_line}{var_match[val]} '
                     i += 1
-                    val = literal_eval(words[i])
-                self.__constraints += ">= " + str(constraint_value) + "\n"
+                    val = int(words[i])
+                constraint_line = f'{constraint_line}>= {constraint_value}\n'
+                self.__constraints.append(constraint_line)
                 nb_clauses += 1
         # Set the CNF-SAT variables as binaries
         self.__binary += "  " + self.__PREFIX + "\n"
         for i in var_match.values():
             self.__binary += "  " + i + "\n"
         self.__converted = True
-        t_fin = time.time() - t_debut
-        print("execution time : " + str(t_fin))
 
 
     def _read_dimacs_file(self, file_name, optionnal_dir = None):
@@ -140,7 +137,10 @@ class Converter:
         Return : None
         """
         if self.is_converted():
-            print(self.__OBJECTIVE + self.__constraints + self.__binary + "End")
+            contraints = ''
+            for constraint in self.__constraints:
+                contraints = f'{contraints}{constraint}'
+            print(self.__OBJECTIVE + contraints + self.__binary + "End")
         else:
             lg.warning("No CNF-SAT has been converted into ILP so far.\n")
 
@@ -171,7 +171,8 @@ class Converter:
         os.makedirs(path_to_folder, exist_ok=True)
         with open(path_to_file, "w") as file:
             file.write(self.__OBJECTIVE)
-            file.write(self.__constraints)
+            for constraint in self.__constraints:
+                file.write(constraint)
             file.write(self.__binary)
             file.write("End")
         lg.debug("Saving done !")
@@ -264,6 +265,10 @@ class Converter:
 
 
 def path_tail(path_name):
+    """
+    Brief : Get the name of the last element (tail) in path_name
+    Return : The tail of path_name
+    """
     head, tail = path.split(path_name)
     return tail or path.basename(head)
 
