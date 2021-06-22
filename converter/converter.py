@@ -15,7 +15,7 @@ from os import listdir
 from pathlib import Path
 import logging as lg
 from ast import literal_eval
-
+import time
 
 class Converter:
     """
@@ -34,6 +34,7 @@ class Converter:
         self.__binary = "" # Specify each CNF-SAT variable as binary
         self.nb_variables = 0 # Number of variables
         self.nb_clauses = 0 # Number of clauses
+        self.time = 0 # Total conversion time execution
 
 
     def _formula_to_constraints(self, lines):
@@ -42,6 +43,8 @@ class Converter:
         Return : None
         > lines : The lines from a DIMACS file format
         """
+        t_debut = time.time()
+        
         self.__converted = False
         self.__constraints = "Subject To\n"
         self.__binary = "Binary\n"
@@ -69,7 +72,7 @@ class Converter:
             else:
                 self.__constraints += "  C" + str(nb_clauses) + ": "
                 i = 0
-                val = literal_eval(words[i])
+                val = int(words[i])
                 constraint_value = 1
                 while val != 0:
                     abs_val = abs(val)
@@ -84,7 +87,7 @@ class Converter:
                             self.__constraints += "+ "
                         self.__constraints += var_match[abs_val] + " "
                     i += 1
-                    val = literal_eval(words[i])
+                    val = int(words[i])
                 self.__constraints += ">= " + str(constraint_value) + "\n"
                 nb_clauses += 1
         # Set the CNF-SAT variables as binaries
@@ -92,6 +95,9 @@ class Converter:
         for i in var_match.values():
             self.__binary += "  " + i + "\n"
         self.__converted = True
+        t_fin = time.time() - t_debut
+        lg.debug("Conversion time : " + str(t_fin) + "s")
+        self.time += t_fin
 
 
     def _read_dimacs_file(self, file_name, optionnal_dir = None):
@@ -251,6 +257,7 @@ def main():
     converter.clear_save_folder()
     
     # test limits in example files
+    t_debut = time.time()
     converter.convert_from_file("test.cnf")
     converter.save_ilp_in_file()
     converter.print_ilp()
@@ -259,6 +266,9 @@ def main():
 
     # test with important data folder
     converter.convert_from_folder(test_folder_name)
+    t_fin = time.time() - t_debut
+    lg.debug("Conversion execution time : " + str(converter.time) + "s")
+    lg.debug("Total execution time : " + str(t_fin) + "s")
 
 if __name__ == "__main__":
     main()
