@@ -39,6 +39,14 @@ class Converter:
 
 
     ## Getters
+    def get_prefix(self):
+        """
+        Brief : Getter for the prefix of ILP variables
+        Return : The prefix
+        """
+        return self.__PREFIX
+
+    
     def get_file_name(self):
         """
         Brief : Getter for the file name
@@ -55,7 +63,7 @@ class Converter:
         return self.__constraints_list
 
 
-    def get_binary(self):
+    def get_binaries(self):
         """
         Brief : Getter for the binaries
         Return : The binaries
