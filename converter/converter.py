@@ -432,7 +432,7 @@ def main():
     #print(converter)
     print(f'n = {converter.get_nb_variables()} m = {converter.get_nb_clauses()}')
     converter.convert_from_folder()
-    
+
     lg.disable(level=lg.DEBUG)
     converter = PulpConverter()
     converter.convert_from_file('example.cnf')

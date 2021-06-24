@@ -6,14 +6,15 @@ File : application.py
 Author : lgbarrere
 Brief : Create a windowed User Interface for the converter
 """
-import os
 from os import path
 from os import listdir
 import tkinter as tk
 from tkinter import filedialog as fd
 from enum import Enum, auto
-import converter as conv
+
 import pulp
+
+from converter import PulpConverter
 
 
 class ColorTheme(Enum):
@@ -35,7 +36,8 @@ class Application:
 
     def __init__(self):
         # Window
-        self.converter = conv.Converter()
+        self.converter = PulpConverter()
+        self.file_list = []
         self.widget_ref = {}
         window = tk.Tk()
         self.widget_ref["window"] = window
@@ -45,21 +47,22 @@ class Application:
         #self.window.iconbitmap("logo.ico")
         # Configurations
         self.radiobutton_var = tk.IntVar()
+        self.color_dict = {}
         if self.color_theme == ColorTheme.LIGHT:
-            self.bg_color = [self.__LIGHT_GREY, self.__ANTHRACITE]
-            self.fg_color = [self.__ANTHRACITE, self.__LIGHT_GREY]
+            self.color_dict['bg'] = [self.__LIGHT_GREY, self.__ANTHRACITE]
+            self.color_dict['fg'] = [self.__ANTHRACITE, self.__LIGHT_GREY]
             self.radiobutton_var.set(0)
         elif self.color_theme == ColorTheme.DARK:
-            self.bg_color = [self.__ANTHRACITE, self.__LIGHT_GREY]
-            self.fg_color = [self.__LIGHT_GREY, self.__ANTHRACITE]
+            self.color_dict['bg'] = [self.__ANTHRACITE, self.__LIGHT_GREY]
+            self.color_dict['fg'] = [self.__LIGHT_GREY, self.__ANTHRACITE]
             self.radiobutton_var.set(1)
-        window.config(bg=self.bg_color[0])
+        window.config(bg=self.color_dict['bg'][0])
         # Solver names
         self.solver_list = pulp.listSolvers(onlyAvailable=True)
         # Frames
-        header_frame = tk.Frame(window, bg=self.bg_color[0])
+        header_frame = tk.Frame(window, bg=self.color_dict['bg'][0])
         self.widget_ref["header_frame"] = header_frame
-        main_frame = tk.Frame(window, bg=self.bg_color[0])
+        main_frame = tk.Frame(window, bg=self.color_dict['bg'][0])
         self.widget_ref["main_frame"] = main_frame
         # components
         self.create_widgets()
@@ -89,20 +92,25 @@ class Application:
         file_menu.add_command(label="Select file", command=self.get_files)
         file_menu.add_command(label="Select folder", command=self.get_folder)
         file_menu.add_separator()
-        file_menu.add_command(label="Clear ILP folder",
-                              command=self.converter.clear_all_save_folder)
+        file_menu.add_command(
+            label="Clear ILP folder",
+            command=self.converter.clear_all_save_folder()
+            )
         file_menu.add_separator()
-        file_menu.add_command(label="Exit",
-                              command=self.widget_ref["window"].destroy)
+        file_menu.add_command(
+            label="Exit", command=self.widget_ref["window"].destroy
+            )
         menu_bar.add_cascade(label="File", menu=file_menu)
         # Theme menu
         theme_menu = tk.Menu(menu_bar, tearoff=0)
-        theme_menu.add_radiobutton(label="Light theme",
-                                   command=self.switch_theme,
-                                   variable=self.radiobutton_var, value=0)
-        theme_menu.add_radiobutton(label="Dark theme",
-                                   command=self.switch_theme,
-                                   variable=self.radiobutton_var, value=1)
+        theme_menu.add_radiobutton(
+            label="Light theme", command=self.switch_theme,
+            variable=self.radiobutton_var, value=0
+            )
+        theme_menu.add_radiobutton(
+            label="Dark theme", command=self.switch_theme,
+            variable=self.radiobutton_var, value=1
+            )
         menu_bar.add_cascade(label="Theme", menu=theme_menu)
         self.widget_ref["window"].config(menu=menu_bar)
 
@@ -113,23 +121,30 @@ class Application:
         Return : None
         """
         # Title
-        label_title = tk.Label(self.widget_ref["header_frame"],
-                               text="Converter",
-                               font=(self.__FONT_THEME, 28),
-                               bg=self.bg_color[0],
-                               fg=self.fg_color[0])
+        label_title = tk.Label(
+            self.widget_ref["header_frame"], text="Converter",
+            font=(self.__FONT_THEME, 28), bg=self.color_dict['bg'][0],
+            fg=self.color_dict['fg'][0]
+            )
         self.widget_ref["label_title"] = label_title
         # Tell which file or folder is selected
-        label_selected = tk.Label(self.widget_ref["header_frame"],
-                                  text="Files loaded : 0",
-                                  font=(self.__FONT_THEME, 16),
-                                  bg=self.bg_color[0],
-                                  fg=self.fg_color[0])
+        label_selected = tk.Label(
+            self.widget_ref["header_frame"], text="Files loaded : 0",
+            font=(self.__FONT_THEME, 16), bg=self.color_dict['bg'][0],
+            fg=self.color_dict['fg'][0]
+            )
         self.widget_ref["label_selected"] = label_selected
+        # Convert button
+        convert_button = tk.Button(
+            self.widget_ref["header_frame"], text="Convert",
+            font=(self.__FONT_THEME, 16), bg="grey",
+            fg=self.color_dict['fg'][1], command=self.convert_files
+            )
+        self.widget_ref["convert_button"] = convert_button
         # Display
         self.widget_ref["header_frame"].pack(expand=True, side="top", ipadx=200)
         label_title.pack(side="top", pady=20)
-        label_selected.pack(side="left", anchor="n")
+        label_selected.pack(side="top", anchor="w")
         self.widget_ref["main_frame"].pack(expand=True, side="top")
 
 
@@ -139,41 +154,38 @@ class Application:
         Return : None
         """
         # Container
-        select_frame = tk.Frame(self.widget_ref["main_frame"], relief="solid",
-                                     bg=self.bg_color[0],
-                                     highlightbackground=self.fg_color[0],
-                                     highlightcolor=self.fg_color[0],
-                                     highlightthickness=5)
+        select_frame = tk.Frame(
+            self.widget_ref["main_frame"], relief="solid",
+            bg=self.color_dict['bg'][0], highlightbackground=self.color_dict['fg'][0],
+            highlightcolor=self.color_dict['fg'][0], highlightthickness=5
+            )
         self.widget_ref["select_frame"] = select_frame
         # Select label
-        label_select = tk.Label(select_frame,
-                                     text="Solver check-boxes",
-                                     font=(self.__FONT_THEME, 20),
-                                     bg=self.bg_color[0],
-                                     fg=self.fg_color[0])
+        label_select = tk.Label(
+            select_frame, text="Solver check-boxes",
+            font=(self.__FONT_THEME, 20), bg=self.color_dict['bg'][0],
+            fg=self.color_dict['fg'][0]
+            )
         self.widget_ref["label_select"] = label_select
         # Check-boxes
         check_list = []
 
         for solver in self.solver_list:
-            button = tk.Checkbutton(select_frame,
-                                    font=(self.__FONT_THEME, 16),
-                                    text=solver,
-                                    bg=self.bg_color[0],
-                                    fg=self.fg_color[0], bd=0,
-                                    selectcolor=self.bg_color[0],
-                                    activebackground=self.bg_color[0],
-                                    activeforeground=self.fg_color[0],
-                                    command=function_todo)
+            button = tk.Checkbutton(
+                select_frame, font=(self.__FONT_THEME, 16),
+                text=solver, bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0], bd=0,
+                selectcolor=self.color_dict['bg'][0],
+                activebackground=self.color_dict['bg'][0],
+                activeforeground=self.color_dict['fg'][0], command=function_todo
+                )
             check_list.append(button)
             self.widget_ref[solver] = button
 
         # Start solving button
-        solve_button = tk.Button(select_frame, text="Start solving",
-                                      font=(self.__FONT_THEME, 16),
-                                      bg="grey",
-                                      fg=self.fg_color[1],
-                                      command=function_todo)
+        solve_button = tk.Button(
+            select_frame, text="Start solving", font=(self.__FONT_THEME, 16),
+            bg="grey", fg=self.color_dict['fg'][1], command=function_todo
+            )
         self.widget_ref["solve_button"] = solve_button
         # Display
         select_frame.pack(side="left", fill="y", padx=(0, 20), ipadx=20)
@@ -189,45 +201,44 @@ class Application:
         Return : None
         """
         # Result labels
-        result_frame = tk.Frame(self.widget_ref["main_frame"], relief="solid",
-                                     bg=self.bg_color[0],
-                                     highlightbackground=self.fg_color[0],
-                                     highlightcolor=self.fg_color[0],
-                                     highlightthickness=5)
+        result_frame = tk.Frame(
+            self.widget_ref["main_frame"], relief="solid",
+            bg=self.color_dict['bg'][0], highlightbackground=self.color_dict['fg'][0],
+            highlightcolor=self.color_dict['fg'][0], highlightthickness=5
+            )
         self.widget_ref["result_frame"] = result_frame
-        label_result = tk.Label(result_frame, text="Display result",
-                                     font=(self.__FONT_THEME, 20),
-                                     bg=self.bg_color[0],
-                                     fg=self.fg_color[0])
+        label_result = tk.Label(
+            result_frame, text="Display result",
+            font=(self.__FONT_THEME, 20), bg=self.color_dict['bg'][0],
+            fg=self.color_dict['fg'][0]
+            )
         self.widget_ref["label_result"] = label_result
-        output_frame = tk.Frame(result_frame,
-                                     bg=self.bg_color[1],
-                                     width=200, height=60)
+        output_frame = tk.Frame(
+            result_frame, bg=self.color_dict['bg'][1], width=200, height=60
+            )
         self.widget_ref["output_frame"] = output_frame
-        label_output = tk.Label(output_frame, text="Processing",
-                                     font=(self.__FONT_THEME, 12),
-                                     bg=self.bg_color[1],
-                                     fg=self.fg_color[1],
-                                     wraplength=200, justify="left")
+        label_output = tk.Label(
+            output_frame, text="Processing",
+            font=(self.__FONT_THEME, 12), bg=self.color_dict['bg'][1],
+            fg=self.color_dict['fg'][1], wraplength=200, justify="left"
+            )
         self.widget_ref["label_output"] = label_output
-        label_satisfied = tk.Label(result_frame,
-                                        text="Satisfied : yes",
-                                        font=(self.__FONT_THEME, 16),
-                                        bg=self.bg_color[0],
-                                        fg=self.fg_color[0])
+        label_satisfied = tk.Label(
+            result_frame, text="Satisfied : yes",
+            font=(self.__FONT_THEME, 16), bg=self.color_dict['bg'][0],
+            fg=self.color_dict['fg'][0]
+            )
         self.widget_ref["label_satisfied"] = label_satisfied
         # Detail information buttons
-        histogram_button = tk.Button(result_frame, text="H",
-                                          font=(self.__FONT_THEME, 18),
-                                          bg="grey",
-                                          fg=self.fg_color[1],
-                                          command=function_todo)
+        histogram_button = tk.Button(
+            result_frame, text="H", font=(self.__FONT_THEME, 18),
+            bg="grey", fg=self.color_dict['fg'][1], command=function_todo
+            )
         self.widget_ref["histogram_button"] = histogram_button
-        solution_button = tk.Button(result_frame, text="S",
-                                         font=(self.__FONT_THEME, 18),
-                                         bg="grey",
-                                         fg=self.fg_color[1],
-                                         command=function_todo)
+        solution_button = tk.Button(
+            result_frame, text="S", font=(self.__FONT_THEME, 18),
+            bg="grey", fg=self.color_dict['fg'][1], command=function_todo
+            )
         self.widget_ref["solution_button"] = solution_button
         # Display
         result_frame.pack(side="right", fill="y", padx=(20, 0), ipadx=20)
@@ -248,12 +259,12 @@ class Application:
         var = self.radiobutton_var.get()
         if var == 0:
             self.color_theme = ColorTheme.LIGHT
-            self.bg_color = [self.__LIGHT_GREY, self.__ANTHRACITE]
-            self.fg_color = [self.__ANTHRACITE, self.__LIGHT_GREY]
+            self.color_dict['bg'] = [self.__LIGHT_GREY, self.__ANTHRACITE]
+            self.color_dict['fg'] = [self.__ANTHRACITE, self.__LIGHT_GREY]
         elif var == 1:
             self.color_theme = ColorTheme.DARK
-            self.bg_color = [self.__ANTHRACITE, self.__LIGHT_GREY]
-            self.fg_color = [self.__LIGHT_GREY, self.__ANTHRACITE]
+            self.color_dict['bg'] = [self.__ANTHRACITE, self.__LIGHT_GREY]
+            self.color_dict['fg'] = [self.__LIGHT_GREY, self.__ANTHRACITE]
         self.set_interface_colors()
 
 
@@ -263,72 +274,114 @@ class Application:
         depending to UI's color theme
         Return : None
         """
-        #self.window
-        self.widget_ref["window"].config(bg=self.bg_color[0])
-        self.widget_ref["header_frame"].config(bg=self.bg_color[0])
-        self.widget_ref["main_frame"].config(bg=self.bg_color[0])
-        self.widget_ref["label_title"].config(bg=self.bg_color[0],
-                                               fg=self.fg_color[0])
-        self.widget_ref["label_selected"].config(bg=self.bg_color[0],
-                                  fg=self.fg_color[0])
-        self.widget_ref["select_frame"].config(bg=self.bg_color[0],
-                                     highlightbackground=self.fg_color[0],
-                                     highlightcolor=self.fg_color[0])
-        self.widget_ref["label_select"].config(bg=self.bg_color[0],
-                                     fg=self.fg_color[0])
-        for text in self.text_list:
-            self.widget_ref[text].config(bg=self.bg_color[0],
-                                         fg=self.fg_color[0], bd=0,
-                                         selectcolor=self.bg_color[0],
-                                         activebackground=self.bg_color[0],
-                                         activeforeground=self.fg_color[0])
-        self.widget_ref["solve_button"].config(bg="grey",
-                                      fg=self.fg_color[1])
-        self.widget_ref["result_frame"].config(bg=self.bg_color[0],
-                                     highlightbackground=self.fg_color[0],
-                                     highlightcolor=self.fg_color[0])
-        self.widget_ref["label_result"].config(bg=self.bg_color[0],
-                                     fg=self.fg_color[0])
-        self.widget_ref["output_frame"].config(bg=self.bg_color[1])
-        self.widget_ref["label_output"].config(bg=self.bg_color[1],
-                                     fg=self.fg_color[1])
-        self.widget_ref["label_satisfied"].config(bg=self.bg_color[0],
-                                        fg=self.fg_color[0])
-        self.widget_ref["histogram_button"].config(bg="grey",
-                                          fg=self.fg_color[1])
-        self.widget_ref["solution_button"].config(bg="grey",
-                                         fg=self.fg_color[1])
+        self.widget_ref["window"].config(bg=self.color_dict['bg'][0])
+        self.widget_ref["header_frame"].config(bg=self.color_dict['bg'][0])
+        self.widget_ref["main_frame"].config(bg=self.color_dict['bg'][0])
+        self.widget_ref["label_title"].config(
+            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            )
+        self.widget_ref["label_selected"].config(
+            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            )
+        self.widget_ref["select_frame"].config(
+            bg=self.color_dict['bg'][0], highlightbackground=self.color_dict['fg'][0],
+            highlightcolor=self.color_dict['fg'][0]
+            )
+        self.widget_ref["label_select"].config(
+            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            )
+        for text in self.solver_list:
+            self.widget_ref[text].config(
+                bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0], bd=0,
+                selectcolor=self.color_dict['bg'][0],
+                activebackground=self.color_dict['bg'][0],
+                activeforeground=self.color_dict['fg'][0]
+                )
+        self.widget_ref["solve_button"].config(
+            bg="grey", fg=self.color_dict['fg'][1]
+            )
+        self.widget_ref["result_frame"].config(
+            bg=self.color_dict['bg'][0], highlightbackground=self.color_dict['fg'][0],
+            highlightcolor=self.color_dict['fg'][0]
+            )
+        self.widget_ref["label_result"].config(
+            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            )
+        self.widget_ref["output_frame"].config(
+            bg=self.color_dict['bg'][1]
+            )
+        self.widget_ref["label_output"].config(
+            bg=self.color_dict['bg'][1], fg=self.color_dict['fg'][1]
+            )
+        self.widget_ref["label_satisfied"].config(
+            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            )
+        self.widget_ref["histogram_button"].config(
+            bg="grey", fg=self.color_dict['fg'][1]
+            )
+        self.widget_ref["solution_button"].config(
+            bg="grey", fg=self.color_dict['fg'][1]
+            )
 
 
     def get_folder(self):
+        """
+        Brief : Ask the user to select a folder to get all files in
+        Return : None
+        """
         # choose a directory
+        self.file_list = []
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, "data")
-        folder = fd.askdirectory(parent=self.widget_ref["window"],
-                                 title="Choose a folder",
-                                 initialdir=path_to_folder)
-        text = "Files loaded : " + str(len(listdir(folder)))
+        folder = fd.askdirectory(
+            parent=self.widget_ref["window"], title="Choose a folder",
+            initialdir=path_to_folder
+            )
+        for file in listdir(folder) :
+            self.file_list.append(path.join(path_to_folder, folder, file))
+        text = "Files loaded : " + str(len(self.file_list))
         self.widget_ref["label_selected"].config(text=text)
-        self.widget_ref["window"].update()
-        self.converter.convert_from_folder(folder)
+
+        if self.file_list :
+            self.widget_ref["convert_button"].pack(
+                side="top", anchor="w", padx=20, pady=10
+                )
 
 
     def get_files(self):
+        """
+        Brief : Ask the user some files to get
+        Return : None
+        """
         filetypes = (
-        ("Text files", "*.txt"),
-        ("CNF text files", "*.cnf"),
-        ("All files", "*.*"))
+            ("All files", "*.*"),
+            ("Text files", "*.txt"),
+            ("CNF text files", "*.cnf"),
+            )
 
         # choose files
+        self.file_list = []
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, "data")
-        file_list = fd.askopenfilenames(parent=self.widget_ref["window"],
-                                        title="Choose files",
-                                        initialdir=path_to_folder)
-        text = "Files loaded : " + str(len(file_list))
+        self.file_list = fd.askopenfilenames(
+            parent=self.widget_ref["window"], title="Choose files",
+            initialdir=path_to_folder, filetypes=filetypes
+            )
+        text = "Files loaded : " + str(len(self.file_list))
         self.widget_ref["label_selected"].config(text=text)
-        self.widget_ref["window"].update()
-        for file in file_list :
+
+        if self.file_list :
+            self.widget_ref["convert_button"].pack(
+                side="top", anchor="w", padx=20, pady=10
+                )
+
+
+    def convert_files(self):
+        """
+        Brief : Convert all DIMACS files into ILP files
+        Return : None
+        """
+        for file in self.file_list :
             self.converter.convert_from_file(file)
             self.converter.save_ilp_in_file()
 
