@@ -15,6 +15,9 @@ from os import listdir
 import shutil
 from pathlib import Path
 import logging as lg
+import time
+
+import pulp
 
 
 class Converter:
@@ -46,7 +49,7 @@ class Converter:
         """
         return self.__PREFIX
 
-    
+
     def get_file_name(self):
         """
         Brief : Getter for the file name
@@ -121,7 +124,7 @@ class Converter:
                 self.__nb_clauses = int(words[i + 1])
             # Start writting the constraints
             else:
-                tmp_constraint_list = []
+                tmp_line_list = []
                 i = 0
                 val = int(words[i])
                 constraint_value = 1
@@ -131,16 +134,16 @@ class Converter:
                     if val < 0:
                         # Respect the rule : not(0) = 1 and not(1) = 0
                         abs_val = -val
-                        tmp_constraint_list.append('- ')
+                        tmp_line_list.append('- ')
                         constraint_value -= 1
                     elif val > 0 and i > 0:
-                        tmp_constraint_list.append('+ ')
+                        tmp_line_list.append('+ ')
                     self.__binary_dict[abs_val] = f'{self.__PREFIX}{abs_val}'
-                    tmp_constraint_list.append(f'{self.__binary_dict[abs_val]} ')
+                    tmp_line_list.append(f'{self.__binary_dict[abs_val]} ')
                     i += 1
                     val = int(words[i])
-                tmp_constraint_list.append(f'>= {constraint_value}')
-                constraint = ''.join(tmp_constraint_list)
+                tmp_line_list.append(f'>= {constraint_value}')
+                constraint = ''.join(tmp_line_list)
                 self.__constraints_list.append(constraint)
                 text_line_list.append(f'  C{nb_clauses}: {constraint}\n')
                 nb_clauses += 1
@@ -172,7 +175,7 @@ class Converter:
         try:
             with open(path_to_file, 'r') as file:
                 lines = file.readlines()
-                lg.debug("Reading done !")
+                lg.debug("Read done !")
                 return lines
         except FileNotFoundError as error:
             lg.critical("The file was not found. %s", error)
@@ -185,17 +188,6 @@ class Converter:
         Return : True is a convertion has been done, False otherwise
         """
         return self.__file_converted[1]
-
-
-    def print_ilp(self):
-        """
-        Brief : Print the converted formula from CNF-SAT into ILP
-        Return : None
-        """
-        if self.is_converted():
-            print(self.__OBJECTIVE + self.__constraints + self.__binary + 'End')
-        else:
-            lg.warning("No CNF-SAT has been converted into ILP so far.\n")
 
 
     def save_ilp_in_file(self, file_name = None, optionnal_dir = None):
@@ -227,7 +219,7 @@ class Converter:
             file.write(self.__constraints)
             file.write(self.__binary)
             file.write('End')
-        lg.debug("Saving done !")
+        lg.debug("Save done !")
 
 
     def convert_from_file(self, file_name, optionnal_dir = None):
@@ -251,11 +243,12 @@ class Converter:
         if folder_name is not None:
             folder_name = path_tail(folder_name)
             path_to_folder = path.join(path_to_folder, folder_name)
-            relative_data_path = self.__DATA_FOLDER_NAME + '/' + folder_name
-            lg.debug("Converting files in folder %s.", relative_data_path)
+            relative_saves_path = f'{self.__SAVE_FOLDER_NAME}/{folder_name}'
+            lg.debug("Converting files in folder %s.", relative_saves_path)
         else:
-            lg.debug("Converting files in folder %s.", self.__DATA_FOLDER_NAME)
+            lg.debug("Converting files in folder %s.", self.__SAVE_FOLDER_NAME)
 
+        lg.disable(level=lg.DEBUG)
         for file_name in listdir(path_to_folder):
             self.__file_converted[0] = file_name
             path_to_file = join(path_to_folder, file_name)
@@ -266,6 +259,7 @@ class Converter:
                         self.save_ilp_in_file(optionnal_dir=folder_name)
                 except FileNotFoundError as error:
                     lg.critical("The file was not found. %s", error)
+        lg.disable(level=lg.NOTSET)
         lg.debug("Folder conversion done !")
 
 
@@ -279,10 +273,10 @@ class Converter:
         path_to_folder = path.join(directory, self.__SAVE_FOLDER_NAME)
         if folder_name is not None:
             path_to_folder = path.join(path_to_folder, folder_name)
-            relative_data_path = self.__DATA_FOLDER_NAME + '/' + folder_name
-            lg.debug("Clearing folder %s.", relative_data_path)
+            relative_saves_path = f'{self.__SAVE_FOLDER_NAME}/{folder_name}'
+            lg.debug("Clearing folder %s.", relative_saves_path)
         else:
-            lg.debug("Clearing folder %s.", self.__DATA_FOLDER_NAME)
+            lg.debug("Clearing folder %s.", self.__SAVE_FOLDER_NAME)
         if not os.path.exists(path_to_folder):
             return
         for file_name in listdir(path_to_folder):
@@ -292,7 +286,7 @@ class Converter:
                     os.remove(path_to_file)
             except OSError as error:
                 lg.critical("The file was not found. %s", error)
-        lg.debug("Folder clearing done !")
+        lg.debug("Folder cleared !")
 
 
     def clear_all_save_folder(self):
@@ -302,7 +296,7 @@ class Converter:
         """
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, self.__SAVE_FOLDER_NAME)
-        lg.debug("Clearing folder %s.", path_to_folder)
+        lg.debug("Clearing folder %s.", self.__SAVE_FOLDER_NAME)
 
         for file_name in listdir(path_to_folder):
             file_path = join(path_to_folder, file_name)
@@ -313,7 +307,103 @@ class Converter:
                     shutil.rmtree(file_path)
             except OSError as error:
                 lg.critical("Failed to delete %s. %s", file_path, error)
-        lg.debug("Folder clearing done !")
+        lg.debug("Folder cleared !")
+
+
+    def __repr__(self):
+        if self.is_converted():
+            return 'Converter :\n' + self.__OBJECTIVE + self.__constraints + \
+                   self.__binary + 'End\n'
+        lg.warning("No CNF-SAT has been converted into ILP so far.\n")
+        return 'Converter : ' + str(None) + '\n'
+
+
+class PulpConverter(Converter):
+    """
+    Brief : Get an ILP instance to create its PuLP version
+    """
+    def __init__(self):
+        super().__init__()
+        self.solver_list = pulp.listSolvers(onlyAvailable=True)
+        self.__problem = None
+        self.__status = pulp.LpStatusUndefined
+        self.__var_dict = {}
+        self.__time = 0
+
+
+    def define_problem(self, name='NoName'):
+        """
+        Brief : If a dimacs has been converted into ILP, define the problem
+        on this converted problem
+        Return : True if the problem is defined, False otherwise
+        """
+        if self.is_converted() is False :
+            return False
+
+        self.__problem = pulp.LpProblem(name=name, sense=pulp.LpMaximize)
+
+        ### Variables
+        binary_dict = self.get_binaries()
+        self.__var_dict = {}
+        for (key, value) in binary_dict.items():
+            self.__var_dict[value] = pulp.LpVariable(
+                name=binary_dict[key], cat=pulp.LpBinary
+                )
+
+        ### Constraints
+        constraints = self.get_constraints()
+        for constraint in constraints :
+            cons_split = constraint.split()
+            i = 0
+            var_list = []
+
+            while cons_split[i] != '>=':
+                sign = 1
+                if cons_split[i] == '-':
+                    sign = -1
+                    i += 1
+                elif cons_split[i] == '+':
+                    i += 1
+                var_list.insert(0, (self.__var_dict[cons_split[i]], sign))
+                i += 1
+
+            res = pulp.LpConstraint(
+                e=pulp.LpAffineExpression(e=var_list),
+                sense=pulp.LpConstraintGE,
+                rhs=int(cons_split[i+1])
+                )
+            self.__problem += res
+
+        ### Objective function
+        self.__problem += pulp.LpVariable(
+            name=binary_dict[0], lowBound=1, upBound=1
+            )
+        self.__status = pulp.LpStatusNotSolved
+        return True
+
+
+    def solve(self):
+        """
+        Brief : Start solving and set the time to proceed
+        Return : None
+        """
+        if self.__status != pulp.LpStatusUndefined :
+            start_time = time.time()
+            self.__status = self.__problem.solve()
+            self.__time = time.time() - start_time
+
+
+    def __repr__(self):
+        print_list = []
+        print_list.append(super().__repr__())
+        print_list.append('Problem : ' + str(self.__problem))
+        if self.__status != pulp.LpStatusUndefined :
+            print_list.append('Objective : ' + str(self.__problem.objective))
+        else :
+            print_list.append('Objective : None')
+        print_list.append('Status : ' + str(pulp.LpStatus[self.__status]))
+        print_list.append('Execution time : ' + str(self.__time))
+        return '\n'.join(print_list) + '\n'
 
 
 def path_tail(path_name):
@@ -333,17 +423,25 @@ def main():
     # verbose debug and prepare the tests
     lg.basicConfig(level=lg.DEBUG)
     test_folder_name = 'dimacs'
-    converter = Converter()
+    converter = PulpConverter()
     converter.clear_all_save_folder()
 
     # test limits in example files
     converter.convert_from_file('test.cnf')
     converter.save_ilp_in_file()
-    converter.print_ilp()
+    #print(converter)
     print(f'n = {converter.get_nb_variables()} m = {converter.get_nb_clauses()}')
     converter.convert_from_folder()
+    
+    lg.disable(level=lg.DEBUG)
+    converter = PulpConverter()
+    converter.convert_from_file('example.cnf')
+    converter.define_problem()
+    converter.solve()
+    print(converter)
 
     # test with important data folder
+    lg.disable(level=lg.NOTSET)
     converter.convert_from_folder(test_folder_name)
 
 
