@@ -13,6 +13,7 @@ import tkinter as tk
 from tkinter import filedialog as fd
 from enum import Enum, auto
 import converter as conv
+import pulp
 
 
 class ColorTheme(Enum):
@@ -54,11 +55,7 @@ class Application:
             self.radiobutton_var.set(1)
         window.config(bg=self.bg_color[0])
         # Solver names
-        self.text_list = []
-        self.text_list.append("Glucose")
-        self.text_list.append("CPLEX")
-        self.text_list.append("lp_solve")
-        self.text_list.append("...")
+        self.solver_list = pulp.listSolvers(onlyAvailable=True)
         # Frames
         header_frame = tk.Frame(window, bg=self.bg_color[0])
         self.widget_ref["header_frame"] = header_frame
@@ -158,10 +155,10 @@ class Application:
         # Check-boxes
         check_list = []
 
-        for text in self.text_list:
+        for solver in self.solver_list:
             button = tk.Checkbutton(select_frame,
                                     font=(self.__FONT_THEME, 16),
-                                    text=text,
+                                    text=solver,
                                     bg=self.bg_color[0],
                                     fg=self.fg_color[0], bd=0,
                                     selectcolor=self.bg_color[0],
@@ -169,7 +166,7 @@ class Application:
                                     activeforeground=self.fg_color[0],
                                     command=function_todo)
             check_list.append(button)
-            self.widget_ref[text] = button
+            self.widget_ref[solver] = button
 
         # Start solving button
         solve_button = tk.Button(select_frame, text="Start solving",

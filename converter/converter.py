@@ -98,7 +98,8 @@ class Converter:
         self.__file_converted[1] = False
         self.__constraints_list = []
         self.__binary_dict = {}
-        self.__binary_dict[0] = 'z' # Consider entry 0 as the objective variable
+        # Consider key 0 to get the objective variable
+        self.__binary_dict[0] = self.__PREFIX
         binary_list = []
         text_line_list = []
         nb_clauses = 1
