@@ -156,7 +156,7 @@ class Converter:
         self.__file_converted[1] = True
 
 
-    def _read_dimacs_file(self, file_name, optionnal_dir = None):
+    def _read_dimacs_file(self, file_name, optional_dir = None):
         """
         Brief : Open a DIMACS file with its given name to get each line
         Return : Each line as an element of the returned list
@@ -167,10 +167,10 @@ class Converter:
         directory = path.dirname(path.dirname(__file__))
         path_to_file = path.join(directory, self.__DATA_FOLDER_NAME)
 
-        if optionnal_dir is None:
+        if optional_dir is None:
             path_to_file = path.join(path_to_file, file_name)
         else:
-            path_to_file = path.join(path_to_file, optionnal_dir, file_name)
+            path_to_file = path.join(path_to_file, optional_dir, file_name)
 
         try:
             with open(path_to_file, 'r') as file:
@@ -190,12 +190,12 @@ class Converter:
         return self.__file_converted[1]
 
 
-    def save_ilp_in_file(self, file_name = None, optionnal_dir = None):
+    def save_ilp_in_file(self, file_name = None, optional_dir = None):
         """
         Brief : Save a converted ILP in a file (created if missing) with a name
         Return : None
         > file_name : The optionnal name of the file to open
-        > optionnal_dir : folder to save the file (created if missing)
+        > optional_dir : folder to save the file (created if missing)
         Note : If no file name is given, save the last converted file
         """
         # If nothing has been converted earlier, don't save anything
@@ -209,8 +209,8 @@ class Converter:
         lg.debug("Saving in file %s.", file_name)
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, self.__SAVE_FOLDER_NAME)
-        if optionnal_dir is not None:
-            path_to_folder = path.join(path_to_folder, optionnal_dir)
+        if optional_dir is not None:
+            path_to_folder = path.join(path_to_folder, optional_dir)
         path_to_file = path.join(path_to_folder, file_name)
         # Create folder and/or file if missing, then save the ILP
         os.makedirs(path_to_folder, exist_ok=True)
@@ -222,19 +222,21 @@ class Converter:
         lg.debug("Save done !")
 
 
-    def convert_from_file(self, file_name, optionnal_dir = None):
+    def convert_from_file(self, file_name, optional_dir = None):
         """
         Brief : Convert a CNF-SAT formula into ILP from the given file_name
         Return : None
         > file_name : The name of the file to open
         """
-        lines = self._read_dimacs_file(file_name, optionnal_dir)
+        lines = self._read_dimacs_file(file_name, optional_dir)
         self._formula_to_constraints(lines)
 
 
     def convert_from_folder(self, folder_name = None):
         """
         Brief : Convert all CNF files into ILP files from the given folder_name
+        and save the result in the saves folder, if a folder_name is given,
+        the file is saves in
         Return : None
         > folder_name : The name of the folder to convert files from
         """
@@ -256,7 +258,7 @@ class Converter:
                 try:
                     with open(path_to_file, 'r'):
                         self.convert_from_file(file_name, folder_name)
-                        self.save_ilp_in_file(optionnal_dir=folder_name)
+                        self.save_ilp_in_file(optional_dir=folder_name)
                 except FileNotFoundError as error:
                     lg.critical("The file was not found. %s", error)
         lg.disable(level=lg.NOTSET)
@@ -331,6 +333,14 @@ class PulpConverter(Converter):
         self.__time = 0
 
 
+    def get_status(self):
+        """
+        Brief : Getter for the status
+        Return : string of status
+        """
+        return str(pulp.LpStatus[self.__status])
+
+
     def define_problem(self, name='NoName'):
         """
         Brief : If a dimacs has been converted into ILP, define the problem
@@ -382,14 +392,14 @@ class PulpConverter(Converter):
         return True
 
 
-    def solve(self):
+    def solve(self, solver=None):
         """
         Brief : Start solving and set the time to proceed
         Return : None
         """
         if self.__status != pulp.LpStatusUndefined :
             start_time = time.time()
-            self.__status = self.__problem.solve()
+            self.__status = self.__problem.solve(solver)
             self.__time = time.time() - start_time
 
 
@@ -429,12 +439,11 @@ def main():
     # test limits in example files
     converter.convert_from_file('test.cnf')
     converter.save_ilp_in_file()
-    #print(converter)
-    print(f'n = {converter.get_nb_variables()} m = {converter.get_nb_clauses()}')
+    print(f'n = {converter.get_nb_variables()}')
+    print(f'm = {converter.get_nb_clauses()}')
     converter.convert_from_folder()
 
     lg.disable(level=lg.DEBUG)
-    converter = PulpConverter()
     converter.convert_from_file('example.cnf')
     converter.define_problem()
     converter.solve()
