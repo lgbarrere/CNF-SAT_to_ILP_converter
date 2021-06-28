@@ -430,10 +430,12 @@ class Application:
         # Otherwise, check if we loaded a folder or some files
         if not self.file_list[0] :
             self.converter.convert_from_folder(self.file_list[1])
+            self.converter.save_all_in_folder(self.file_list[1])
         else :
             for file in self.file_list[0] :
+                file = conv.path_tail(file)
                 self.converter.convert_from_file(file, self.file_list[1])
-                self.converter.save_ilp_in_file(optional_dir=self.file_list[1])
+                self.converter.save_ilp_in_file(file, self.file_list[1])
         # Update selected files
         self.file_list[3] = self.file_list[2]
         self.file_list[2] = 0
@@ -469,18 +471,23 @@ class Application:
         if self.file_list[3] == 0 :
             self.widget_ref['label_output'].config(text='Already solved !')
             return
-        self.converter.define_problem()
+        file_name = None
+        for file in self.file_list[0] :
+            file_name = conv.path_tail(file)
+            self.converter.define_problem(file_name)
         self.widget_ref['label_output'].config(text='Solving')
         self.widget_ref['label_satisfied'].config(text='Status :')
         self.widget_ref['window'].update()
         i = 0
         for solver in self.solver_list:
             if self.checkbox_var[i].get() == 1 :
-                self.converter.solve(pulp.getSolver(solver))
+                if file_name is not None :
+                    self.converter.solve(file_name, pulp.getSolver(solver))
             i += 1
         self.widget_ref['label_output'].config(text='Finished solving')
-        text = 'Status : ' + self.converter.get_status()
-        self.widget_ref['label_satisfied'].config(text=text)
+        if file_name is not None :
+            text = 'Status : ' + self.converter.get_problem(file_name).get_status()
+            self.widget_ref['label_satisfied'].config(text=text)
 
 
 def function_todo():
