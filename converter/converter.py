@@ -24,8 +24,11 @@ class Constants:
     """
     Brief : Constants
     """
+    __ROOT_FOLDER_NAME = path.dirname(path.dirname(__file__)) # Project folder
     __DATA_FOLDER_NAME = 'data' # Folder containing files to convert
     __SAVE_FOLDER_NAME = 'saves' # Folder to save the converted files
+    __RESULT_FOLDER_NAME = 'result' # Folder to save ILP solutions
+    __RESULT_FILE_NAME = 'result.sol' # File to save ILP solutions
 
 
     def __init__(self):
@@ -33,6 +36,14 @@ class Constants:
 
 
     ## Getters
+    def get_root_folder(self):
+        """
+        Brief : Getter for the root folder name
+        Return : The root folder name
+        """
+        return self.__ROOT_FOLDER_NAME
+
+
     def get_data_folder(self):
         """
         Brief : Getter for the data folder name
@@ -47,6 +58,22 @@ class Constants:
         Return : The save folder name
         """
         return self.__SAVE_FOLDER_NAME
+
+
+    def get_result_folder(self):
+        """
+        Brief : Getter for the result folder name
+        Return : The result folder name
+        """
+        return self.__RESULT_FOLDER_NAME
+
+
+    def get_result_file(self):
+        """
+        Brief : Getter for the result file name
+        Return : The result file name
+        """
+        return self.__RESULT_FILE_NAME
 
 
 class ILPFormula:
@@ -488,6 +515,7 @@ class PulpConverter(Converter):
         return self.__solver_list
 
 
+    ## Methods
     def define_problem(self, file_name, name='NoName'):
         """
         Brief : If a dimacs has been converted into ILP, define the problem
@@ -544,6 +572,11 @@ class PulpConverter(Converter):
 
 
     def define_problem_from_folder(self, optional_dir, name='NoName'):
+        """
+        Brief : Define problems from a folder converted into ILP,
+        define the problem on all converted problems
+        Return : None
+        """
         if optional_dir is None :
             lg.debug("Define all from %s.", self.get_data_folder())
         else :
@@ -568,15 +601,16 @@ class PulpConverter(Converter):
         pulp_problem = self.__problem_dict[file_name]
         if not pulp_problem.is_solved() :
             start_time = time.time()
+            # If the solver is interrupted, consider the problem is unsolved
             try :
                 pulp_problem.status = pulp_problem.problem.solve(solver)
-            except :
+            except pulp.apis.core.PulpSolverError :
                 lg.warning("Interrupted solver.")
                 pulp_problem.status = pulp.LpStatusNotSolved
             pulp_problem.time = time.time() - start_time
         else :
             lg.warning("Undefined problem or already solved.")
-                
+
 
 
     def solve_folder(self, optional_dir, solver=None):
@@ -599,6 +633,26 @@ class PulpConverter(Converter):
         lg.debug("Folder solve done !")
 
 
+    def save_results(self):
+        """
+        Brief : Save all solved ILP results in a file (created if missing)
+        Return : None
+        """
+        # If the file has been solved
+        folder = self.get_result_folder()
+        lg.debug("Saving solutions in folder %s.", folder)
+        path_to_folder = path.join(self.get_root_folder(), folder)
+        path_to_file = path.join(path_to_folder, self.get_result_file())
+        # Create folder and/or file if missing, then save the solutions
+        os.makedirs(path_to_folder, exist_ok=True)
+        with open(path_to_file, 'w') as file:
+            for (file_name, problem) in self.__problem_dict.items() :
+                file.write(f'File : {file_name} | ')
+                file.write(f'Status : {problem.get_status()} | ')
+                file.write(f'Execution time : {problem.time}\n')
+        lg.debug("Solutions Saved !")
+
+
 def path_tail(path_name):
     """
     Brief : Get the name of the last element (tail) in path_name
@@ -608,8 +662,12 @@ def path_tail(path_name):
     return tail or path.basename(head)
 
 
-def to_ilp_suffix(dimacs_file):
-    return Path(dimacs_file).with_suffix('.lpt')
+def to_ilp_suffix(file):
+    """
+    Brief : Change the extension of the given file name by '.lpt'
+    Return : The modified file name
+    """
+    return Path(file).with_suffix('.lpt')
 
 
 def main():
@@ -636,6 +694,7 @@ def main():
     converter.convert_from_file(example_file)
     converter.define_problem(example_file)
     converter.solve(example_file)
+    converter.save_results()
     print(converter.get_formula(example_file))
     print(converter.get_problem(example_file))
 

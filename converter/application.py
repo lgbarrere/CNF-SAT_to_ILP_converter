@@ -39,50 +39,44 @@ class Application:
     """
     Brief : Create the UI that uses the converter
     """
-    color_theme = ColorTheme.DARK
     __FONT_THEME = 'Arial'
 
     def __init__(self):
-        # Window
+        # Converter
         self.converter = PulpConverter()
         self.file_list = []
         self.folder = None
         self.nb_dimacs = 0
         self.nb_ilp = 0
+        # Color theme
+        self.color_theme = ColorTheme.DARK
+        self.bg_color = Color.ANTHRACITE.value
+        self.invert_bg_color = Color.LIGHT_GREY.value
+        self.fg_color = Color.LIGHT_GREY.value
+        self.invert_fg_color = Color.ANTHRACITE.value
+        # Window
         self.widget_ref = {}
         window = tk.Tk()
         self.widget_ref['window'] = window
+        #self.window.iconbitmap('logo.ico')
         window.title('SAT-ILP converter')
         window.geometry('640x480')
         window.minsize(640, 480)
-        #self.window.iconbitmap("logo.ico")
+        window.config(bg=self.bg_color)
         # Configurations
         self.radiobutton_var = tk.IntVar()
+        self.radiobutton_var.set(1) # Set to dark theme
         self.checkbox_var = []
-        self.color_dict = {}
-        if self.color_theme == ColorTheme.LIGHT:
-            self.color_dict['bg'] = [Color.LIGHT_GREY.value,
-                                     Color.ANTHRACITE.value]
-            self.color_dict['fg'] = [Color.ANTHRACITE.value,
-                                     Color.LIGHT_GREY.value]
-            self.radiobutton_var.set(0)
-        elif self.color_theme == ColorTheme.DARK:
-            self.color_dict['bg'] = [Color.ANTHRACITE.value,
-                                     Color.LIGHT_GREY.value]
-            self.color_dict['fg'] = [Color.LIGHT_GREY.value,
-                                     Color.ANTHRACITE.value]
-            self.radiobutton_var.set(1)
-        window.config(bg=self.color_dict['bg'][0])
         # Solver names
         self.solver_list = pulp.listSolvers(onlyAvailable=True)
         # Frames
         header_frame = tk.Frame(
-            window, bg=self.color_dict['bg'][0], width=580, height=180
+            window, bg=self.bg_color, width=580, height=180
             )
         self.widget_ref['header_frame'] = header_frame
-        main_frame = tk.Frame(window, bg=self.color_dict['bg'][0])
+        main_frame = tk.Frame(window, bg=self.bg_color)
         self.widget_ref['main_frame'] = main_frame
-        # components
+        # Components
         self.create_widgets()
 
 
@@ -141,22 +135,22 @@ class Application:
         # Title
         label_title = tk.Label(
             self.widget_ref['header_frame'], text='Converter',
-            font=(self.__FONT_THEME, 28), bg=self.color_dict['bg'][0],
-            fg=self.color_dict['fg'][0]
+            font=(self.__FONT_THEME, 28), bg=self.bg_color,
+            fg=self.fg_color
             )
         self.widget_ref['label_title'] = label_title
         # Tell how many file are selected
         label_sat_selected = tk.Label(
             self.widget_ref['header_frame'], text='DIMACS files loaded : 0',
-            font=(self.__FONT_THEME, 16), bg=self.color_dict['bg'][0],
-            fg=self.color_dict['fg'][0]
+            font=(self.__FONT_THEME, 16), bg=self.bg_color,
+            fg=self.fg_color
             )
         self.widget_ref['label_sat_selected'] = label_sat_selected
         # Convert button
         convert_button = tk.Button(
             self.widget_ref['header_frame'], text='Convert',
             font=(self.__FONT_THEME, 16), bg='grey',
-            fg=self.color_dict['fg'][1], command=self.convert_files
+            fg=self.invert_fg_color, command=self.convert_files
             )
         self.widget_ref['convert_button'] = convert_button
         # Display
@@ -178,22 +172,22 @@ class Application:
         # Container
         select_frame = tk.Frame(
             self.widget_ref['main_frame'], relief='solid',
-            bg=self.color_dict['bg'][0],
-            highlightbackground=self.color_dict['fg'][0],
-            highlightcolor=self.color_dict['fg'][0], highlightthickness=5
+            bg=self.bg_color,
+            highlightbackground=self.fg_color,
+            highlightcolor=self.fg_color, highlightthickness=5
             )
         self.widget_ref['select_frame'] = select_frame
         # Select label
         label_solver = tk.Label(
             select_frame, text='Solver check-boxes',
-            font=(self.__FONT_THEME, 20), bg=self.color_dict['bg'][0],
-            fg=self.color_dict['fg'][0]
+            font=(self.__FONT_THEME, 20), bg=self.bg_color,
+            fg=self.fg_color
             )
         self.widget_ref['label_solver'] = label_solver
         label_ilp_selected = tk.Label(
             select_frame, text='ILP files : 0',
-            font=(self.__FONT_THEME, 16), bg=self.color_dict['bg'][0],
-            fg=self.color_dict['fg'][0]
+            font=(self.__FONT_THEME, 16), bg=self.bg_color,
+            fg=self.fg_color
             )
         self.widget_ref['label_ilp_selected'] = label_ilp_selected
         # Check-boxes
@@ -205,11 +199,11 @@ class Application:
                 self.checkbox_var[i].set(1)
             button = tk.Checkbutton(
                 select_frame, font=(self.__FONT_THEME, 14),
-                text=solver, bg=self.color_dict['bg'][0],
-                fg=self.color_dict['fg'][0], bd=0,
-                selectcolor=self.color_dict['bg'][0],
-                activebackground=self.color_dict['bg'][0],
-                activeforeground=self.color_dict['fg'][0],
+                text=solver, bg=self.bg_color,
+                fg=self.fg_color, bd=0,
+                selectcolor=self.bg_color,
+                activebackground=self.bg_color,
+                activeforeground=self.fg_color,
                 variable=self.checkbox_var[i], onvalue=1, offvalue=0,
                 )
             check_list.append(button)
@@ -219,7 +213,7 @@ class Application:
         # Start solving button
         solve_button = tk.Button(
             select_frame, text='Start solving', font=(self.__FONT_THEME, 16),
-            bg='grey', fg=self.color_dict['fg'][1], command=self.solve_selection
+            bg='grey', fg=self.invert_fg_color, command=self.solve_selection
             )
         self.widget_ref['solve_button'] = solve_button
         # Display
@@ -239,42 +233,42 @@ class Application:
         # Result labels
         result_frame = tk.Frame(
             self.widget_ref['main_frame'], relief='solid',
-            bg=self.color_dict['bg'][0],
-            highlightbackground=self.color_dict['fg'][0],
-            highlightcolor=self.color_dict['fg'][0], highlightthickness=5
+            bg=self.bg_color,
+            highlightbackground=self.fg_color,
+            highlightcolor=self.fg_color, highlightthickness=5
             )
         self.widget_ref['result_frame'] = result_frame
         label_result = tk.Label(
             result_frame, text='Display result',
-            font=(self.__FONT_THEME, 20), bg=self.color_dict['bg'][0],
-            fg=self.color_dict['fg'][0]
+            font=(self.__FONT_THEME, 20), bg=self.bg_color,
+            fg=self.fg_color
             )
         self.widget_ref['label_result'] = label_result
         output_frame = tk.Frame(
-            result_frame, bg=self.color_dict['bg'][1], width=200, height=60
+            result_frame, bg=self.invert_bg_color, width=200, height=60
             )
         self.widget_ref['output_frame'] = output_frame
         label_output = tk.Label(
             output_frame, text='',
-            font=(self.__FONT_THEME, 12), bg=self.color_dict['bg'][1],
-            fg=self.color_dict['fg'][1], wraplength=200, justify='left'
+            font=(self.__FONT_THEME, 12), bg=self.invert_bg_color,
+            fg=self.invert_fg_color, wraplength=200, justify='left'
             )
         self.widget_ref['label_output'] = label_output
         label_satus = tk.Label(
             result_frame, text='Status :',
-            font=(self.__FONT_THEME, 16), bg=self.color_dict['bg'][0],
-            fg=self.color_dict['fg'][0]
+            font=(self.__FONT_THEME, 16), bg=self.bg_color,
+            fg=self.fg_color
             )
         self.widget_ref['label_satus'] = label_satus
         # Detail information buttons
         histogram_button = tk.Button(
             result_frame, text='H', font=(self.__FONT_THEME, 18),
-            bg='grey', fg=self.color_dict['fg'][1], command=function_todo
+            bg='grey', fg=self.invert_fg_color, command=function_todo
             )
         self.widget_ref['histogram_button'] = histogram_button
         solution_button = tk.Button(
             result_frame, text='S', font=(self.__FONT_THEME, 18),
-            bg='grey', fg=self.color_dict['fg'][1], command=function_todo
+            bg='grey', fg=self.invert_fg_color, command=function_todo
             )
         self.widget_ref['solution_button'] = solution_button
         # Display
@@ -296,16 +290,16 @@ class Application:
         var = self.radiobutton_var.get()
         if var == 0:
             self.color_theme = ColorTheme.LIGHT
-            self.color_dict['bg'] = [Color.LIGHT_GREY.value,
-                                     Color.ANTHRACITE.value]
-            self.color_dict['fg'] = [Color.ANTHRACITE.value,
-                                     Color.LIGHT_GREY.value]
+            self.bg_color = Color.LIGHT_GREY.value
+            self.invert_bg_color = Color.ANTHRACITE.value
+            self.fg_color = Color.ANTHRACITE.value
+            self.invert_fg_color = Color.LIGHT_GREY.value
         elif var == 1:
             self.color_theme = ColorTheme.DARK
-            self.color_dict['bg'] = [Color.ANTHRACITE.value,
-                                     Color.LIGHT_GREY.value]
-            self.color_dict['fg'] = [Color.LIGHT_GREY.value,
-                                     Color.ANTHRACITE.value]
+            self.bg_color = Color.ANTHRACITE.value
+            self.invert_bg_color = Color.LIGHT_GREY.value
+            self.fg_color = Color.LIGHT_GREY.value
+            self.invert_fg_color = Color.ANTHRACITE.value
         self.set_interface_colors()
 
 
@@ -315,56 +309,63 @@ class Application:
         depending to UI's color theme
         Return : None
         """
-        self.widget_ref['window'].config(bg=self.color_dict['bg'][0])
-        self.widget_ref['header_frame'].config(bg=self.color_dict['bg'][0])
-        self.widget_ref['main_frame'].config(bg=self.color_dict['bg'][0])
+        # Main
+        self.widget_ref['window'].config(bg=self.bg_color)
+        # Header component
+        self.widget_ref['header_frame'].config(bg=self.bg_color)
+        self.widget_ref['main_frame'].config(bg=self.bg_color)
         self.widget_ref['label_title'].config(
-            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            bg=self.bg_color, fg=self.fg_color
             )
         self.widget_ref['label_sat_selected'].config(
-            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            bg=self.bg_color, fg=self.fg_color
             )
+        # Left component
         self.widget_ref['select_frame'].config(
-            bg=self.color_dict['bg'][0],
-            highlightbackground=self.color_dict['fg'][0],
-            highlightcolor=self.color_dict['fg'][0]
+            bg=self.bg_color,
+            highlightbackground=self.fg_color,
+            highlightcolor=self.fg_color
             )
         self.widget_ref['label_solver'].config(
-            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            bg=self.bg_color, fg=self.fg_color
+            )
+        self.widget_ref['label_ilp_selected'].config(
+            bg=self.bg_color, fg=self.fg_color
             )
         for text in self.solver_list:
             self.widget_ref[text].config(
-                bg=self.color_dict['bg'][0],
-                fg=self.color_dict['fg'][0], bd=0,
-                selectcolor=self.color_dict['bg'][0],
-                activebackground=self.color_dict['bg'][0],
-                activeforeground=self.color_dict['fg'][0]
+                bg=self.bg_color,
+                fg=self.fg_color, bd=0,
+                selectcolor=self.bg_color,
+                activebackground=self.bg_color,
+                activeforeground=self.fg_color
                 )
         self.widget_ref['solve_button'].config(
-            bg='grey', fg=self.color_dict['fg'][1]
+            bg='grey', fg=self.invert_fg_color
             )
+        # Right component
         self.widget_ref['result_frame'].config(
-            bg=self.color_dict['bg'][0],
-            highlightbackground=self.color_dict['fg'][0],
-            highlightcolor=self.color_dict['fg'][0]
+            bg=self.bg_color,
+            highlightbackground=self.fg_color,
+            highlightcolor=self.fg_color
             )
         self.widget_ref['label_result'].config(
-            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            bg=self.bg_color, fg=self.fg_color
             )
         self.widget_ref['output_frame'].config(
-            bg=self.color_dict['bg'][1]
+            bg=self.invert_bg_color
             )
         self.widget_ref['label_output'].config(
-            bg=self.color_dict['bg'][1], fg=self.color_dict['fg'][1]
+            bg=self.invert_bg_color, fg=self.invert_fg_color
             )
         self.widget_ref['label_satus'].config(
-            bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
+            bg=self.bg_color, fg=self.fg_color
             )
         self.widget_ref['histogram_button'].config(
-            bg='grey', fg=self.color_dict['fg'][1]
+            bg='grey', fg=self.invert_fg_color
             )
         self.widget_ref['solution_button'].config(
-            bg='grey', fg=self.color_dict['fg'][1]
+            bg='grey', fg=self.invert_fg_color
             )
 
 
@@ -501,6 +502,7 @@ class Application:
                     text = 'Status : Solved all'
                     self.widget_ref['label_satus'].config(text=text)
             i += 1
+        self.converter.save_results()
 
 
 def function_todo():

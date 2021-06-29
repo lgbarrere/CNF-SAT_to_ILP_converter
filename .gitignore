@@ -131,4 +131,5 @@ dmypy.json
 # Example folders and archives
 saves/
 data/dimacs
+result/
 *.zip
