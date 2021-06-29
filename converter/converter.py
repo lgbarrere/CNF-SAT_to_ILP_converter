@@ -133,7 +133,7 @@ class ILPFormula:
             binaries = f'Binary\n  {tmp_binaries}\n'
             return self.__OBJECTIVE + ''.join(constraint_list) + \
                    binaries + 'End'
-        lg.warning("No CNF-SAT has been converted into ILP so far.\n")
+        lg.warning("No CNF-SAT has been converted into ILP so far.")
         return f'Formula : {str(None)}\n'
 
 
@@ -154,7 +154,7 @@ class Converter(Constants):
         Brief : Get the ILP formula from file_name
         Return : The formula
         """
-        return self.__formula_dict[file_name]
+        return self.__formula_dict[to_ilp_suffix(file_name)]
 
 
     def get_ilp_string(self, file_name):
@@ -162,7 +162,7 @@ class Converter(Constants):
         Brief : Get the string of an ILP from file_name
         Return : The ILP string
         """
-        return self.__ilp_string_dict[file_name]
+        return self.__ilp_string_dict[to_ilp_suffix(file_name)]
 
 
     ## Methods
@@ -173,6 +173,18 @@ class Converter(Constants):
         """
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, self.get_data_folder())
+        if optional_dir is not None:
+            path_to_folder = path.join(path_to_folder, optional_dir)
+        return path_to_folder
+
+
+    def get_save_path(self, optional_dir = None):
+        """
+        Brief : Get the path to data folder
+        Return : The path (string)
+        """
+        directory = path.dirname(path.dirname(__file__))
+        path_to_folder = path.join(directory, self.get_save_folder())
         if optional_dir is not None:
             path_to_folder = path.join(path_to_folder, optional_dir)
         return path_to_folder
@@ -206,6 +218,7 @@ class Converter(Constants):
         > file_name : The name of the file to get formula
         """
         # Initializations
+        file_name = to_ilp_suffix(file_name)
         formula = self.__formula_dict[file_name]
         formula.converted = False
         formula.binary_dict = {} # Match SAT variables to ILP variables
@@ -255,6 +268,7 @@ class Converter(Constants):
         Brief : Convert the ILP from file_name to a string
         Return : None
         """
+        file_name = to_ilp_suffix(file_name)
         formula = self.__formula_dict[file_name]
         self.__ilp_string_dict[file_name] = str(formula)
 
@@ -266,12 +280,17 @@ class Converter(Constants):
         > file_name : The name of the file to open
         > optional_dir : sub folder with the file to convert
         """
-        self.__formula_dict[file_name] = ILPFormula()
         lines = self.__read_dimacs_file(file_name, optional_dir)
         if lines is None:
             return
-        self.__convert_to_ilp(lines, file_name)
-        self.__ilp_to_string(file_name)
+        file_name = to_ilp_suffix(file_name)
+        # If the conversion has not already been set
+        if file_name not in self.__formula_dict :
+            self.__formula_dict[file_name] = ILPFormula()
+            self.__convert_to_ilp(lines, file_name)
+            self.__ilp_to_string(file_name)
+        else :
+            lg.warning("This file has already been converted.")
 
 
     def convert_from_folder(self, optional_dir = None):
@@ -310,29 +329,29 @@ class Converter(Constants):
         > file_name : The name of the file to open
         > optional_dir : folder to save the file (created if missing)
         """
+        if file_name is None :
+            lg.critical("No save file name was given.")
+            return
+        file_name = to_ilp_suffix(file_name)
         # If nothing has been converted earlier, don't save anything
         if not self.__formula_dict[file_name].is_converted() :
-            lg.warning("Can't save a non converted ILP.\n")
-            return
-        # If no file name is given, use the last converted file instead
-        save_file = None
-        if file_name is not None :
-            save_file = Path(file_name).with_suffix('.lpt')
-        else :
-            lg.critical("No save file name was given.\n")
+            lg.warning("Can't save a non converted ILP.")
             return
 
-        lg.debug("Saving in file %s.", save_file)
+        lg.debug("Saving in file %s.", file_name)
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, self.get_save_folder())
         if optional_dir is not None:
             path_to_folder = path.join(path_to_folder, optional_dir)
-        path_to_file = path.join(path_to_folder, save_file)
+        path_to_file = path.join(path_to_folder, file_name)
         # Create folder and/or file if missing, then save the ILP
         os.makedirs(path_to_folder, exist_ok=True)
-        with open(path_to_file, 'w') as file:
-            file.write(self.get_ilp_string(file_name))
-        lg.debug("Save done !")
+        if not os.path.isfile(path_to_file) :
+            with open(path_to_file, 'w') as file:
+                file.write(self.get_ilp_string(file_name))
+            lg.debug("Save done !")
+        else :
+            lg.warning("This save already exists.")
 
 
     def save_all_in_folder(self, optional_dir=None):
@@ -412,6 +431,15 @@ class PulpProblem:
         self.time = 0
 
 
+    def is_solved(self):
+        """
+        Brief : Check if the problem has been solved or not
+        Return : True if the problem is solved, False otherwise
+        """
+        return self.status != pulp.LpStatusNotSolved and \
+               self.status != pulp.LpStatusUndefined
+
+
     ## Getters
     def get_status(self):
         """
@@ -449,7 +477,7 @@ class PulpConverter(Converter):
         Brief : Getter for the ILP problem from file_name
         Return : The ILP problem
         """
-        return self.__problem_dict[file_name]
+        return self.__problem_dict[to_ilp_suffix(file_name)]
 
 
     def get_solvers(self):
@@ -466,8 +494,12 @@ class PulpConverter(Converter):
         on this converted problem
         Return : True if the problem is defined, False otherwise
         """
+        file_name = to_ilp_suffix(file_name)
         formula = self.get_formula(file_name)
         if not formula.is_converted() :
+            return False
+        if file_name in self.__problem_dict :
+            lg.warning("Problem already defined.")
             return False
 
         pulp_problem = PulpProblem()
@@ -511,16 +543,60 @@ class PulpConverter(Converter):
         return True
 
 
+    def define_problem_from_folder(self, optional_dir, name='NoName'):
+        if optional_dir is None :
+            lg.debug("Define all from %s.", self.get_data_folder())
+        else :
+            relative_path = f'{self.get_save_folder()}/{optional_dir}'
+            lg.debug("Define all from %s.", relative_path)
+        lg.disable(level=lg.DEBUG)
+        path_to_folder = self.get_data_path(optional_dir)
+        for file_name in listdir(path_to_folder) :
+            path_to_file = os.path.join(path_to_folder, file_name)
+            if os.path.isfile(path_to_file) :
+                self.define_problem(file_name, name)
+        lg.disable(level=lg.NOTSET)
+        lg.debug("Folder definition done !")
+
+
     def solve(self, file_name, solver=None):
         """
         Brief : Start solving and set the time to proceed
         Return : None
         """
+        file_name = to_ilp_suffix(file_name)
         pulp_problem = self.__problem_dict[file_name]
-        if pulp_problem.status != pulp.LpStatusUndefined :
+        if not pulp_problem.is_solved() :
             start_time = time.time()
-            pulp_problem.status = pulp_problem.problem.solve(solver)
+            try :
+                pulp_problem.status = pulp_problem.problem.solve(solver)
+            except :
+                lg.warning("Interrupted solver.")
+                pulp_problem.status = pulp.LpStatusNotSolved
             pulp_problem.time = time.time() - start_time
+        else :
+            lg.warning("Undefined problem or already solved.")
+                
+
+
+    def solve_folder(self, optional_dir, solver=None):
+        """
+        Brief : Start solving an entire folder and set the time to proceed
+        Return : None
+        """
+        if optional_dir is None :
+            lg.debug("Solving all from %s.", self.get_data_folder())
+        else :
+            relative_path = f'{self.get_save_folder()}/{optional_dir}'
+            lg.debug("Solving all from %s.", relative_path)
+        lg.disable(level=lg.DEBUG)
+        path_to_folder = self.get_data_path(optional_dir)
+        for file_name in listdir(path_to_folder) :
+            path_to_file = os.path.join(path_to_folder, file_name)
+            if os.path.isfile(path_to_file) :
+                self.solve(file_name, solver)
+        lg.disable(level=lg.NOTSET)
+        lg.debug("Folder solve done !")
 
 
 def path_tail(path_name):
@@ -530,6 +606,10 @@ def path_tail(path_name):
     """
     head, tail = path.split(path_name)
     return tail or path.basename(head)
+
+
+def to_ilp_suffix(dimacs_file):
+    return Path(dimacs_file).with_suffix('.lpt')
 
 
 def main():

@@ -6,6 +6,7 @@ File : application.py
 Author : lgbarrere
 Brief : Create a windowed User Interface for the converter
 """
+import os
 from os import path
 from os import listdir
 import tkinter as tk
@@ -45,7 +46,9 @@ class Application:
         # Window
         self.converter = PulpConverter()
         self.file_list = []
-        self.reset_file_list()
+        self.folder = None
+        self.nb_dimacs = 0
+        self.nb_ilp = 0
         self.widget_ref = {}
         window = tk.Tk()
         self.widget_ref['window'] = window
@@ -257,12 +260,12 @@ class Application:
             fg=self.color_dict['fg'][1], wraplength=200, justify='left'
             )
         self.widget_ref['label_output'] = label_output
-        label_satisfied = tk.Label(
-            result_frame, text='Satisfied :',
+        label_satus = tk.Label(
+            result_frame, text='Status :',
             font=(self.__FONT_THEME, 16), bg=self.color_dict['bg'][0],
             fg=self.color_dict['fg'][0]
             )
-        self.widget_ref['label_satisfied'] = label_satisfied
+        self.widget_ref['label_satus'] = label_satus
         # Detail information buttons
         histogram_button = tk.Button(
             result_frame, text='H', font=(self.__FONT_THEME, 18),
@@ -280,7 +283,7 @@ class Application:
         output_frame.pack_propagate(0)
         output_frame.pack(side='top')
         label_output.pack(side='top', anchor='w')
-        label_satisfied.pack(side='top', pady=5)
+        label_satus.pack(side='top', pady=5)
         histogram_button.pack(anchor='s', side='left', pady=20, expand=True)
         solution_button.pack(anchor='s', side='right', pady=20, expand=True)
 
@@ -354,7 +357,7 @@ class Application:
         self.widget_ref['label_output'].config(
             bg=self.color_dict['bg'][1], fg=self.color_dict['fg'][1]
             )
-        self.widget_ref['label_satisfied'].config(
+        self.widget_ref['label_satus'].config(
             bg=self.color_dict['bg'][0], fg=self.color_dict['fg'][0]
             )
         self.widget_ref['histogram_button'].config(
@@ -365,28 +368,43 @@ class Application:
             )
 
 
+    def update_selected_files(self):
+        """
+        Brief : Update selection file labels
+        Return : None
+        """
+        sat_text = 'DIMACS files loaded : ' + str(self.nb_dimacs)
+        self.widget_ref['label_sat_selected'].config(text=sat_text)
+        ilp_text = 'ILP files : ' + str(self.nb_ilp)
+        self.widget_ref['label_ilp_selected'].config(text=ilp_text)
+
+
     def get_folder(self):
         """
         Brief : Ask the user to select a folder to get all files in
         Return : None
         """
         # choose a directory
-        self.reset_file_list()
         directory = path.dirname(path.dirname(__file__))
         path_to_folder = path.join(directory, 'data')
         folder = fd.askdirectory(
             parent=self.widget_ref['window'], title='Choose a folder',
             initialdir=path_to_folder
             )
-        if folder == '' :
-            text = 'DIMACS files loaded : 0'
-            self.widget_ref['label_sat_selected'].config(text=text)
+        # Reset the file list because a folder is asked
+        self.file_list = []
+        if folder == '' or conv.path_tail(folder) == 'data':
+            self.folder = None
+            self.nb_dimacs = len(
+                [file for file in os.listdir(path_to_folder) \
+                 if os.path.isfile(os.path.join(path_to_folder, file))]
+                )
         else :
-            self.file_list[1] = conv.path_tail(folder)
-            self.file_list[2] = len(listdir(folder))
-            self.update_selected_files()
-            self.widget_ref['label_output'].config(text='Files selected')
-            self.widget_ref['label_satisfied'].config(text='Status :')
+            self.folder = conv.path_tail(folder)
+            self.nb_dimacs = len(listdir(folder))
+        self.update_selected_files()
+        self.widget_ref['label_output'].config(text='Files selected')
+        self.widget_ref['label_satus'].config(text='Status :')
 
 
     def get_files(self):
@@ -401,22 +419,22 @@ class Application:
             )
 
         # choose files
-        self.reset_file_list()
         directory = path.dirname(path.dirname(__file__))
-        path_to_folder = path.join(directory, 'data')
-        self.file_list[0] = fd.askopenfilenames(
+        data_folder = self.converter.get_data_folder()
+        path_to_folder = path.join(directory, data_folder)
+        file_list = fd.askopenfilenames(
             parent=self.widget_ref['window'], title='Choose files',
             initialdir=path_to_folder, filetypes=filetypes
             )
-        folder = 'data'
-        if self.file_list[0] :
-            folder = conv.path_tail(path.dirname(self.file_list[0][0]))
-            if folder != 'data' :
-                self.file_list[1] = folder
-            self.file_list[2] = len(self.file_list[0])
+        if file_list :
+            self.file_list = file_list
+            self.folder = conv.path_tail(path.dirname(self.file_list[0]))
+            if self.folder == data_folder :
+                self.folder = None
+            self.nb_dimacs = len(self.file_list)
             self.update_selected_files()
             self.widget_ref['label_output'].config(text='Files selected')
-            self.widget_ref['label_satisfied'].config(text='Status :')
+            self.widget_ref['label_satus'].config(text='Status :')
 
 
     def convert_files(self):
@@ -425,42 +443,22 @@ class Application:
         Return : None
         """
         # Do nothing if no sat file is loaded
-        if self.file_list[2] == 0 :
+        if self.nb_dimacs == 0 :
             return
         # Otherwise, check if we loaded a folder or some files
-        if not self.file_list[0] :
-            self.converter.convert_from_folder(self.file_list[1])
-            self.converter.save_all_in_folder(self.file_list[1])
+        if not self.file_list :
+            self.converter.convert_from_folder(self.folder)
+            self.converter.save_all_in_folder(self.folder)
         else :
-            for file in self.file_list[0] :
+            for file in self.file_list :
                 file = conv.path_tail(file)
-                self.converter.convert_from_file(file, self.file_list[1])
-                self.converter.save_ilp_in_file(file, self.file_list[1])
+                self.converter.convert_from_file(file, self.folder)
+                self.converter.save_ilp_in_file(file, self.folder)
         # Update selected files
-        self.file_list[3] = self.file_list[2]
-        self.file_list[2] = 0
+        self.nb_ilp = self.nb_dimacs
+        self.nb_dimacs = 0
         self.update_selected_files()
         self.widget_ref['label_output'].config(text='Files converted')
-
-
-    def update_selected_files(self):
-        """
-        Brief : Update selection file labels
-        Return : None
-        """
-        sat_text = 'DIMACS files loaded : ' + str(self.file_list[2])
-        self.widget_ref['label_sat_selected'].config(text=sat_text)
-        ilp_text = 'ILP files : ' + str(self.file_list[3])
-        self.widget_ref['label_ilp_selected'].config(text=ilp_text)
-
-
-    def reset_file_list(self):
-        """
-        Brief : Set file slection to 0
-        Return : None
-        """
-        # Respectively SAT files, folder, and number of SAT and ILP files
-        self.file_list = [[], None, 0, 0]
 
 
     def solve_selection(self):
@@ -468,26 +466,41 @@ class Application:
         Brief : Solve selected ILP file with selected solvers
         Return : None
         """
-        if self.file_list[3] == 0 :
-            self.widget_ref['label_output'].config(text='Already solved !')
+        if self.nb_ilp == 0 :
             return
-        file_name = None
-        for file in self.file_list[0] :
-            file_name = conv.path_tail(file)
-            self.converter.define_problem(file_name)
+        if self.file_list :
+            for file in self.file_list :
+                file_name = conv.path_tail(file)
+                self.converter.define_problem(file_name)
+        else :
+            self.converter.define_problem_from_folder(self.folder)
         self.widget_ref['label_output'].config(text='Solving')
-        self.widget_ref['label_satisfied'].config(text='Status :')
+        self.widget_ref['label_satus'].config(text='Status :')
         self.widget_ref['window'].update()
         i = 0
+
         for solver in self.solver_list:
             if self.checkbox_var[i].get() == 1 :
-                if file_name is not None :
-                    self.converter.solve(file_name, pulp.getSolver(solver))
+                if self.file_list :
+                    for file in self.file_list :
+                        file = conv.path_tail(file)
+                        self.converter.solve(file, pulp.getSolver(solver))
+                        self.widget_ref['label_output'].config(
+                            text='Finished solving'
+                            )
+                        text = 'Status : ' + \
+                               self.converter.get_problem(file).get_status()
+                        self.widget_ref['label_satus'].config(text=text)
+                else :
+                    self.converter.solve_folder(
+                        self.folder, pulp.getSolver(solver)
+                        )
+                    self.widget_ref['label_output'].config(
+                        text='Finished solving'
+                        )
+                    text = 'Status : Solved all'
+                    self.widget_ref['label_satus'].config(text=text)
             i += 1
-        self.widget_ref['label_output'].config(text='Finished solving')
-        if file_name is not None :
-            text = 'Status : ' + self.converter.get_problem(file_name).get_status()
-            self.widget_ref['label_satisfied'].config(text=text)
 
 
 def function_todo():
