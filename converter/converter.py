@@ -447,14 +447,13 @@ class Converter(Constants):
         lg.debug("Folder cleared !")
 
 
-class PulpProblem:
+class SolverInformation:
     """
-    Brief : Defines a PuLP problem
+    Brief : Get for a given solver what is its information
     """
-    def __init__(self):
-        self.problem = None
-        self.status = pulp.LpStatusUndefined
-        self.var_dict = {}
+    def __init__(self, solver=None, status=pulp.LpStatusUndefined):
+        self.solver = solver
+        self.status = status
         self.time = 0
 
 
@@ -471,30 +470,52 @@ class PulpProblem:
     def get_status(self):
         """
         Brief : Getter for the status
-        Return : string of status
+        Return : The status in a string
         """
         return str(pulp.LpStatus[self.status])
 
 
     def __repr__(self):
+        return 'Solver : ' + self.solver.name + \
+               '\nStatus : ' + self.get_status() + \
+               '\nExecution time : ' + str(self.time) + '\n'
+
+
+class PulpProblem:
+    """
+    Brief : Defines a PuLP problem
+    """
+    def __init__(self):
+        self.problem = None
+        self.var_dict = {}
+        self.solver_dict = {}
+
+
+    ## Getters
+    def get_solver_info(self, solver_name):
+        """
+        Brief : Getter for the solver information (from its name)
+        Return : The solver information
+        """
+        return self.solver_dict[solver_name]
+
+
+    def __repr__(self):
         print_list = []
         print_list.append('Problem : ' + str(self.problem))
-        if self.status != pulp.LpStatusUndefined :
-            print_list.append('Objective : ' + str(self.problem.objective))
-        else :
-            print_list.append('Objective : None')
-        print_list.append('Status : ' + str(pulp.LpStatus[self.status]))
-        print_list.append('Execution time : ' + str(self.time))
-        return '\n'.join(print_list) + '\n'
+        print_list.append('Objective : ' + str(self.problem.objective))
+        for solver_info in self.solver_dict.values() :
+            print_list.append(str(solver_info))
+        return '\n'.join(print_list)
 
 
 class PulpConverter(Converter):
     """
     Brief : Get an ILP instance to create its PuLP version
     """
-    def __init__(self):
+    def __init__(self, solver_list=pulp.listSolvers(onlyAvailable=True)):
         super().__init__()
-        self.__solver_list = pulp.listSolvers(onlyAvailable=True)
+        self.__solver_list = solver_list
         self.__problem_dict = {}
 
 
@@ -567,7 +588,11 @@ class PulpConverter(Converter):
         pulp_problem.problem += pulp.LpVariable(
             name=binary_dict[0], lowBound=1, upBound=1
             )
-        pulp_problem.status = pulp.LpStatusNotSolved
+
+        for solver_name in self.__solver_list :
+            pulp_problem.solver_dict[solver_name] = SolverInformation(
+                    pulp.getSolver(solver_name), pulp.LpStatusNotSolved
+                )
         return True
 
 
@@ -592,22 +617,23 @@ class PulpConverter(Converter):
         lg.debug("Folder definition done !")
 
 
-    def solve(self, file_name, solver=None):
+    def solve(self, file_name, solver_name='PULP_CBC_CMD'):
         """
         Brief : Start solving and set the time to proceed
         Return : None
         """
         file_name = to_ilp_suffix(file_name)
         pulp_problem = self.__problem_dict[file_name]
-        if not pulp_problem.is_solved() :
+        solver_info = pulp_problem.solver_dict[solver_name]
+        if not solver_info.is_solved() :
             start_time = time.time()
             # If the solver is interrupted, consider the problem is unsolved
             try :
-                pulp_problem.status = pulp_problem.problem.solve(solver)
+                solver_info.status = pulp_problem.problem.solve(solver_info.solver)
             except pulp.apis.core.PulpSolverError :
                 lg.warning("Interrupted solver.")
-                pulp_problem.status = pulp.LpStatusNotSolved
-            pulp_problem.time = time.time() - start_time
+                solver_info.status = pulp.LpStatusNotSolved
+            solver_info.time = time.time() - start_time
         else :
             lg.warning("Undefined problem or already solved.")
 
@@ -647,9 +673,12 @@ class PulpConverter(Converter):
         os.makedirs(path_to_folder, exist_ok=True)
         with open(path_to_file, 'w') as file:
             for (file_name, problem) in self.__problem_dict.items() :
-                file.write(f'File : {file_name} | ')
-                file.write(f'Status : {problem.get_status()} | ')
-                file.write(f'Execution time : {problem.time}\n')
+                file.write(f'File : {file_name}\n')
+                for solver_name in self.__solver_list :
+                    solver_info = problem.solver_dict[solver_name]
+                    file.write(f'  Solver : {solver_name}')
+                    file.write(f' | Status : {solver_info.get_status()}')
+                    file.write(f' | Execution time : {solver_info.time}\n')
         lg.debug("Solutions Saved !")
 
 

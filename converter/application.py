@@ -67,8 +67,6 @@ class Application:
         self.radiobutton_var = tk.IntVar()
         self.radiobutton_var.set(1) # Set to dark theme
         self.checkbox_var = []
-        # Solver names
-        self.solver_list = pulp.listSolvers(onlyAvailable=True)
         # Frames
         header_frame = tk.Frame(
             window, bg=self.bg_color, width=580, height=180
@@ -193,7 +191,7 @@ class Application:
         # Check-boxes
         check_list = []
         i = 0
-        for solver in self.solver_list:
+        for solver in self.converter.get_solvers() :
             self.checkbox_var.append(tk.IntVar())
             if i == 0 :
                 self.checkbox_var[i].set(1)
@@ -479,18 +477,20 @@ class Application:
         self.widget_ref['label_satus'].config(text='Status :')
         self.widget_ref['window'].update()
         i = 0
-
-        for solver in self.solver_list:
+        solve_try = False
+        
+        for solver in self.converter.get_solvers() :
             if self.checkbox_var[i].get() == 1 :
                 if self.file_list :
                     for file in self.file_list :
                         file = conv.path_tail(file)
-                        self.converter.solve(file, pulp.getSolver(solver))
+                        self.converter.solve(file, solver)
                         self.widget_ref['label_output'].config(
                             text='Finished solving'
                             )
-                        text = 'Status : ' + \
-                               self.converter.get_problem(file).get_status()
+                        problem = self.converter.get_problem(file)
+                        status = problem.get_solver_info(solver).get_status()
+                        text = 'Status : ' + status
                         self.widget_ref['label_satus'].config(text=text)
                 else :
                     self.converter.solve_folder(
@@ -501,8 +501,16 @@ class Application:
                         )
                     text = 'Status : Solved all'
                     self.widget_ref['label_satus'].config(text=text)
+                solve_try = True
             i += 1
-        self.converter.save_results()
+
+        if not solve_try :
+            self.widget_ref['label_output'].config(
+                text='No solver was selected'
+                )
+            text = 'Status : None'
+            self.widget_ref['label_satus'].config(text=text)
+            self.converter.save_results()
 
 
 def function_todo():
