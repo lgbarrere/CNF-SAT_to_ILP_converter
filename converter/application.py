@@ -494,7 +494,7 @@ class Application:
                         self.widget_ref['label_satus'].config(text=text)
                 else :
                     self.converter.solve_folder(
-                        self.folder, pulp.getSolver(solver)
+                        self.folder, solver
                         )
                     self.widget_ref['label_output'].config(
                         text='Finished solving'
@@ -504,13 +504,14 @@ class Application:
                 solve_try = True
             i += 1
 
-        if not solve_try :
+        if solve_try :
+            self.converter.save_results()
+        else :
             self.widget_ref['label_output'].config(
                 text='No solver was selected'
                 )
             text = 'Status : None'
             self.widget_ref['label_satus'].config(text=text)
-            self.converter.save_results()
 
 
 def function_todo():
