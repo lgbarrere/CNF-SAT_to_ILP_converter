@@ -13,7 +13,8 @@ import tkinter as tk
 from tkinter import filedialog as fd
 from enum import Enum, auto
 
-import pulp
+import numpy as np
+import matplotlib.pyplot as plt
 
 import converter as conv
 from converter import PulpConverter
@@ -35,7 +36,72 @@ class Color(Enum):
     LIGHT_GREY = '#E5E5E5'
 
 
-class Application:
+class Histogram:
+    """
+    Brief : Create a histogram of the execution time for each solver
+    """
+    def __init__(self, converter, file_tuple, solver_list):
+        self.title = 'Solver execution time'
+        self.x_label = 'Solver and ILP'
+        self.y_label = 'Execution time'
+        self.fig = None
+        self.converter = converter
+        self.file_list = []
+        for file in file_tuple :
+            self.file_list.append(conv.path_tail(file))
+        self.solver_list = solver_list
+
+
+    def show(self):
+        """
+        Brief : Show the histogram in a new window
+        Return : None
+        """
+        # Initialisations
+        label_list = []
+        solver_time_dict = {}
+
+        for solver in self.solver_list :
+            solver_time_dict[solver] = []
+
+        for file in self.file_list :
+            label_list.append(file)
+            for solver in self.solver_list :
+                info = self.converter.get_problem(file).get_solver_info(solver)
+                solver_time_dict[solver].append(info.get_time())
+
+        label_len = len(label_list)
+        nb_solvers = len(self.solver_list)
+        x_list = np.arange(label_len)  # The label locations
+        width = 0.8/nb_solvers
+
+        # Plot build
+        self.fig, axis_x = plt.subplots()
+        rect_list = []
+        i = 0
+
+        for solver in self.solver_list :
+            pos_list = x_list + i * width - (nb_solvers - 1) * (width / 2)
+            rect = axis_x.bar(
+                pos_list, solver_time_dict[solver], width, label=solver
+                )
+            rect_list.append(rect)
+            i += 1
+
+        # Add some text for labels, title and custom x-axis tick labels, etc.
+        axis_x.set_ylabel(self.y_label)
+        axis_x.set_title(self.title)
+        axis_x.set_xticks(x_list)
+        axis_x.set_xticklabels(label_list)
+        axis_x.legend()
+
+        for rect in rect_list :
+            axis_x.bar_label(rect)
+
+        plt.show()
+
+
+class Application():
     """
     Brief : Create the UI that uses the converter
     """
@@ -44,10 +110,13 @@ class Application:
     def __init__(self):
         # Converter
         self.converter = PulpConverter()
-        self.file_list = []
+        self.sat_file_tuple = ()
+        self.ilp_file_tuple = ()
         self.folder = None
         self.nb_dimacs = 0
         self.nb_ilp = 0
+        # Histogram
+        self.histogram = None
         # Color theme
         self.color_theme = ColorTheme.DARK
         self.bg_color = Color.ANTHRACITE.value
@@ -261,7 +330,7 @@ class Application:
         # Detail information buttons
         histogram_button = tk.Button(
             result_frame, text='H', font=(self.__FONT_THEME, 18),
-            bg='grey', fg=self.invert_fg_color, command=function_todo
+            bg='grey', fg=self.invert_fg_color, command=None
             )
         self.widget_ref['histogram_button'] = histogram_button
         solution_button = tk.Button(
@@ -330,7 +399,7 @@ class Application:
         self.widget_ref['label_ilp_selected'].config(
             bg=self.bg_color, fg=self.fg_color
             )
-        for text in self.solver_list:
+        for text in self.converter.get_solvers() :
             self.widget_ref[text].config(
                 bg=self.bg_color,
                 fg=self.fg_color, bd=0,
@@ -391,7 +460,7 @@ class Application:
             initialdir=path_to_folder
             )
         # Reset the file list because a folder is asked
-        self.file_list = []
+        self.sat_file_tuple = []
         if folder == '' or conv.path_tail(folder) == 'data':
             self.folder = None
             self.nb_dimacs = len(
@@ -421,16 +490,16 @@ class Application:
         directory = path.dirname(path.dirname(__file__))
         data_folder = self.converter.get_data_folder()
         path_to_folder = path.join(directory, data_folder)
-        file_list = fd.askopenfilenames(
+        file_tuple = fd.askopenfilenames(
             parent=self.widget_ref['window'], title='Choose files',
             initialdir=path_to_folder, filetypes=filetypes
             )
-        if file_list :
-            self.file_list = file_list
-            self.folder = conv.path_tail(path.dirname(self.file_list[0]))
+        if file_tuple :
+            self.sat_file_tuple = file_tuple
+            self.folder = conv.path_tail(path.dirname(file_tuple[0]))
             if self.folder == data_folder :
                 self.folder = None
-            self.nb_dimacs = len(self.file_list)
+            self.nb_dimacs = len(self.sat_file_tuple)
             self.update_selected_files()
             self.widget_ref['label_output'].config(text='Files selected')
             self.widget_ref['label_satus'].config(text='Status :')
@@ -445,15 +514,16 @@ class Application:
         if self.nb_dimacs == 0 :
             return
         # Otherwise, check if we loaded a folder or some files
-        if not self.file_list :
+        if not self.sat_file_tuple :
             self.converter.convert_from_folder(self.folder)
             self.converter.save_all_in_folder(self.folder)
         else :
-            for file in self.file_list :
+            for file in self.sat_file_tuple :
                 file = conv.path_tail(file)
                 self.converter.convert_from_file(file, self.folder)
                 self.converter.save_ilp_in_file(file, self.folder)
         # Update selected files
+        self.ilp_file_tuple = self.sat_file_tuple
         self.nb_ilp = self.nb_dimacs
         self.nb_dimacs = 0
         self.update_selected_files()
@@ -467,8 +537,8 @@ class Application:
         """
         if self.nb_ilp == 0 :
             return
-        if self.file_list :
-            for file in self.file_list :
+        if self.ilp_file_tuple :
+            for file in self.ilp_file_tuple :
                 file_name = conv.path_tail(file)
                 self.converter.define_problem(file_name)
         else :
@@ -478,11 +548,13 @@ class Application:
         self.widget_ref['window'].update()
         i = 0
         solve_try = False
-        
+        select_solver_list = []
+
         for solver in self.converter.get_solvers() :
             if self.checkbox_var[i].get() == 1 :
-                if self.file_list :
-                    for file in self.file_list :
+                select_solver_list.append(solver)
+                if self.ilp_file_tuple :
+                    for file in self.ilp_file_tuple :
                         file = conv.path_tail(file)
                         self.converter.solve(file, solver)
                         self.widget_ref['label_output'].config(
@@ -505,6 +577,12 @@ class Application:
             i += 1
 
         if solve_try :
+            self.histogram = Histogram(
+                self.converter, self.ilp_file_tuple, select_solver_list
+                )
+            self.widget_ref['histogram_button'].config(
+                command=self.histogram.show
+                )
             self.converter.save_results()
         else :
             self.widget_ref['label_output'].config(

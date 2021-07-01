@@ -475,6 +475,14 @@ class SolverInformation:
         return str(pulp.LpStatus[self.status])
 
 
+    def get_time(self):
+        """
+        Brief : Getter for the execution time
+        Return : The time
+        """
+        return self.time
+
+
     def __repr__(self):
         return 'Solver : ' + self.solver.name + \
                '\nStatus : ' + self.get_status() + \
