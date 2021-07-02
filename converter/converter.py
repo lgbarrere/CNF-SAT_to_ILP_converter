@@ -237,6 +237,26 @@ class Converter(Constants):
         return None
 
 
+    def __read_ilp_file(self, file_name, optional_dir = None):
+        """
+        Brief : Open a DIMACS file with its given name to get each line
+        Return : Each line as an element of the returned list
+        > file_name : The name of the file to open
+        """
+        lg.debug("Reading file %s.", file_name)
+        path_to_folder = self.get_save_path(optional_dir)
+        path_to_file = path.join(path_to_folder, file_name)
+
+        try:
+            with open(path_to_file, 'r') as file:
+                lines = file.readlines()
+                lg.debug("Read done !")
+                return lines
+        except FileNotFoundError as error:
+            lg.critical("The file was not found. %s", error)
+        return None
+
+
     def __convert_to_ilp(self, lines, file_name):
         """
         Brief : Convert a CNF-SAT formula into ILP
@@ -251,7 +271,7 @@ class Converter(Constants):
         formula.binary_dict = {} # Match SAT variables to ILP variables
          # Consider key 0 as objective
         formula.binary_dict[0] = formula.get_prefix()
-        nb_clauses = 1
+        nb_clauses = 0
 
         # Process
         for line in lines:
@@ -271,6 +291,7 @@ class Converter(Constants):
                 i = 0
                 val = int(words[i])
                 goal = 1
+                nb_clauses += 1
                 while val != 0:
                     # Get each variable as int (to know if it's positive)
                     if val < 0:
@@ -286,7 +307,6 @@ class Converter(Constants):
                     i += 1
                     val = int(words[i])
                 formula.constraint_dict[f'C{nb_clauses}'] = (word_list, goal)
-                nb_clauses += 1
         formula.converted = True
 
 
@@ -320,11 +340,105 @@ class Converter(Constants):
             lg.warning("This file has already been converted.")
 
 
+    def __set_ilp(self, lines, file_name):
+         # Initializations
+        file_name = to_ilp_suffix(file_name)
+        formula = self.__formula_dict[file_name]
+        formula.binary_dict = {} # Match SAT variables to ILP variables
+         # Consider key 0 as objective
+        formula.binary_dict[0] = formula.get_prefix()
+        nb_clauses = 0
+        nb_variables = 0
+        read_constraint = False
+        read_binary = False
+        for line in lines :
+            words = line.split()
+            if words[0] == 'Subject' :
+                read_constraint = True
+                continue
+            elif words[0] == 'Binary' :
+                read_constraint = False
+                read_binary = True
+                continue
+            elif words[0] == 'End' :
+                read_binary = False
+            if read_constraint :
+                i = 0
+                term_list = []
+                while words[i] == '' :
+                    i += 1
+                constraint_name = words[i].replace(':', '')
+                i += 1
+                while words[i] != '>=' :
+                    term_list.append(words[i])
+                    i += 1
+                goal = int(words[i + 1])
+                nb_clauses += 1
+                formula.constraint_dict[constraint_name] = (term_list, goal)
+            if read_binary :
+                i = 0
+                while words[i] == '' :
+                    i += 1
+                if words[i] == formula.get_prefix() :
+                    continue
+                sat_var = int(words[i].replace(formula.get_prefix(), ''))
+                formula.binary_dict[sat_var] = words[i]
+                nb_variables += 1
+        
+        formula.size = (nb_variables, nb_clauses) # Respectively number of variables and clauses
+        formula.converted = True
+
+
+    def ilp_from_file(self, file_name, optional_dir = None):
+        """
+        Brief : Store ILP from the given file_name
+        Return : None
+        > file_name : The name of the file to open
+        > optional_dir : sub folder with the file to convert
+        """
+        lines = self.__read_ilp_file(file_name, optional_dir)
+        if lines is None:
+            return
+        file_name = to_ilp_suffix(file_name)
+        # If the conversion has not already been set
+        if file_name not in self.__formula_dict :
+            self.__formula_dict[file_name] = ILPFormula()
+            self.__set_ilp(lines, file_name)
+            self.__ilp_to_string(file_name)
+        else :
+            lg.warning("This ilp file has already been read.")
+
+
+    def ilp_from_folder(self, optional_dir = None):
+        """
+        Brief : Store all ILP files from the given folder_name
+        Return : None
+        > optional_dir : The name of the folder to convert files from
+        """
+        path_to_folder = self.get_save_path(optional_dir)
+
+        if optional_dir is None:
+            lg.debug("Reading ILP files in folder %s.", self.get_save_folder())
+        else :
+            relative_path = f'{self.get_save_folder()}/{optional_dir}'
+            lg.debug("Reading ILP files in folder %s.", relative_path)
+
+        lg.disable(level=lg.DEBUG)
+        for file_name in listdir(path_to_folder):
+            path_to_file = join(path_to_folder, file_name)
+            if isfile(path_to_file):
+                try:
+                    with open(path_to_file, 'r'):
+                        self.ilp_from_file(file_name, optional_dir)
+                except FileNotFoundError as error:
+                    lg.critical("The file was not found. %s", error)
+        lg.disable(level=lg.NOTSET)
+        lg.debug("Folder read !")
+
+
     def convert_from_folder(self, optional_dir = None):
         """
         Brief : Convert all CNF files into ILP files from the given folder_name
-        and save the result in the saves folder, if a folder_name is given,
-        the file is saves in
         Return : None
         > optional_dir : The name of the folder to convert files from
         """
@@ -611,12 +725,12 @@ class PulpConverter(Converter):
         Return : None
         """
         if optional_dir is None :
-            lg.debug("Define all from %s.", self.get_data_folder())
+            lg.debug("Define all from %s.", self.get_save_folder())
         else :
             relative_path = f'{self.get_save_folder()}/{optional_dir}'
             lg.debug("Define all from %s.", relative_path)
         lg.disable(level=lg.DEBUG)
-        path_to_folder = self.get_data_path(optional_dir)
+        path_to_folder = self.get_save_path(optional_dir)
         for file_name in listdir(path_to_folder) :
             path_to_file = os.path.join(path_to_folder, file_name)
             if os.path.isfile(path_to_file) :
@@ -653,12 +767,12 @@ class PulpConverter(Converter):
         Return : None
         """
         if optional_dir is None :
-            lg.debug("Solving all from %s.", self.get_data_folder())
+            lg.debug("Solving all from %s.", self.get_save_folder())
         else :
             relative_path = f'{self.get_save_folder()}/{optional_dir}'
             lg.debug("Solving all from %s.", relative_path)
         lg.disable(level=lg.DEBUG)
-        path_to_folder = self.get_data_path(optional_dir)
+        path_to_folder = self.get_save_path(optional_dir)
         for file_name in listdir(path_to_folder) :
             path_to_file = os.path.join(path_to_folder, file_name)
             if os.path.isfile(path_to_file) :

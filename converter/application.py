@@ -168,8 +168,10 @@ class Application():
         self.widget_ref['menu_bar'] = menu_bar
         # File menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label='Select file', command=self.get_files)
-        file_menu.add_command(label='Select folder', command=self.get_folder)
+        file_menu.add_command(label='Select DIMACS file', command=self.get_dimacs_files)
+        file_menu.add_command(label='Select DIMACS folder', command=self.get_dimacs_folder)
+        file_menu.add_command(label='Select ILP file', command=self.get_ilp_files)
+        file_menu.add_command(label='Select ILP folder', command=self.get_ilp_folder)
         file_menu.add_separator()
         file_menu.add_command(
             label='Clear ILP folder',
@@ -447,9 +449,9 @@ class Application():
         self.widget_ref['label_ilp_selected'].config(text=ilp_text)
 
 
-    def get_folder(self):
+    def get_dimacs_folder(self):
         """
-        Brief : Ask the user to select a folder to get all files in
+        Brief : Ask the user to select a folder to get all DIAMCS files in
         Return : None
         """
         # choose a directory
@@ -460,24 +462,21 @@ class Application():
             initialdir=path_to_folder
             )
         # Reset the file list because a folder is asked
-        self.sat_file_tuple = []
+        self.sat_file_tuple = ()
         if folder == '' or conv.path_tail(folder) == 'data':
             self.folder = None
-            self.nb_dimacs = len(
-                [file for file in os.listdir(path_to_folder) \
-                 if os.path.isfile(os.path.join(path_to_folder, file))]
-                )
+            self.nb_dimacs = len(files_only_from_folder(path_to_folder))
         else :
             self.folder = conv.path_tail(folder)
-            self.nb_dimacs = len(listdir(folder))
+            self.nb_dimacs = len(files_only_from_folder(folder))
         self.update_selected_files()
         self.widget_ref['label_output'].config(text='Files selected')
         self.widget_ref['label_satus'].config(text='Status :')
 
 
-    def get_files(self):
+    def get_dimacs_files(self):
         """
-        Brief : Ask the user some files to get
+        Brief : Ask the user some DIMACS files to get
         Return : None
         """
         filetypes = (
@@ -500,6 +499,65 @@ class Application():
             if self.folder == data_folder :
                 self.folder = None
             self.nb_dimacs = len(self.sat_file_tuple)
+            self.update_selected_files()
+            self.widget_ref['label_output'].config(text='Files selected')
+            self.widget_ref['label_satus'].config(text='Status :')
+
+
+    def get_ilp_folder(self):
+        """
+        Brief : Ask the user to select a folder to get all ILP files in
+        Return : None
+        """
+        # choose a directory
+        directory = path.dirname(path.dirname(__file__))
+        path_to_folder = path.join(directory, 'saves')
+        folder = fd.askdirectory(
+            parent=self.widget_ref['window'], title='Choose a folder',
+            initialdir=path_to_folder
+            )
+        # Reset the file list because a folder is asked
+        self.ilp_file_tuple = ()
+        if folder == '' or conv.path_tail(folder) == 'saves':
+            self.folder = None
+            self.nb_ilp = len(files_only_from_folder(path_to_folder))
+        else :
+            self.folder = conv.path_tail(folder)
+            self.nb_ilp = len(files_only_from_folder(folder))
+        self.converter.ilp_from_folder(self.folder)
+        self.update_selected_files()
+        self.widget_ref['label_output'].config(text='Files selected')
+        self.widget_ref['label_satus'].config(text='Status :')
+
+
+    def get_ilp_files(self):
+        """
+        Brief : Ask the user some ILP files to get
+        Return : None
+        """
+        filetypes = (
+            ('All files', '*.*'),
+            ('CNF text files', '*.lpt'),
+            )
+
+        # choose files
+        directory = path.dirname(path.dirname(__file__))
+        save_folder = self.converter.get_save_folder()
+        path_to_folder = path.join(directory, save_folder)
+        file_tuple = fd.askopenfilenames(
+            parent=self.widget_ref['window'], title='Choose files',
+            initialdir=path_to_folder, filetypes=filetypes
+            )
+        if file_tuple :
+            self.ilp_file_tuple = file_tuple
+            self.folder = conv.path_tail(path.dirname(file_tuple[0]))
+            if self.folder == save_folder :
+                self.folder = None
+            for file_name in file_tuple :
+                self.converter.ilp_from_file(
+                    conv.path_tail(file_name), optional_dir=self.folder
+                    )
+            self.nb_ilp = len(self.ilp_file_tuple)
             self.update_selected_files()
             self.widget_ref['label_output'].config(text='Files selected')
             self.widget_ref['label_satus'].config(text='Status :')
@@ -577,8 +635,19 @@ class Application():
             i += 1
 
         if solve_try :
+            file_list = []
+            if self.ilp_file_tuple :
+                file_list = self.ilp_file_tuple
+            else :
+                directory = path.dirname(path.dirname(__file__))
+                save_folder = self.converter.get_save_folder()
+                path_to_folder = path.join(directory, save_folder)
+                if self.folder is not None :
+                    path_to_folder = path.join(path_to_folder, self.folder)
+                for file_name in files_only_from_folder(path_to_folder) :
+                    file_list.append(file_name)
             self.histogram = Histogram(
-                self.converter, self.ilp_file_tuple, select_solver_list
+                self.converter, file_list, select_solver_list
                 )
             self.widget_ref['histogram_button'].config(
                 command=self.histogram.show
@@ -590,6 +659,11 @@ class Application():
                 )
             text = 'Status : None'
             self.widget_ref['label_satus'].config(text=text)
+
+
+def files_only_from_folder(path_to_folder):
+    return [file for file in os.listdir(path_to_folder) \
+            if os.path.isfile(os.path.join(path_to_folder, file))]
 
 
 def function_todo():
