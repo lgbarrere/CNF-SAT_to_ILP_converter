@@ -8,7 +8,6 @@ Brief : Create a windowed User Interface for the converter
 """
 import os
 from os import path
-from os import listdir
 import tkinter as tk
 from tkinter import filedialog as fd
 from enum import Enum, auto
@@ -455,20 +454,19 @@ class Application():
         Return : None
         """
         # choose a directory
-        directory = path.dirname(path.dirname(__file__))
-        path_to_folder = path.join(directory, 'data')
+        path_to_folder = self.converter.get_data_path()
         folder = fd.askdirectory(
             parent=self.widget_ref['window'], title='Choose a folder',
             initialdir=path_to_folder
             )
         # Reset the file list because a folder is asked
         self.sat_file_tuple = ()
-        if folder == '' or conv.path_tail(folder) == 'data':
+        if folder == '' or conv.path_tail(folder) == self.converter.get_data_folder() :
             self.folder = None
-            self.nb_dimacs = len(files_only_from_folder(path_to_folder))
+            self.nb_dimacs = len(files_from_folder(path_to_folder))
         else :
             self.folder = conv.path_tail(folder)
-            self.nb_dimacs = len(files_only_from_folder(folder))
+            self.nb_dimacs = len(files_from_folder(folder))
         self.update_selected_files()
         self.widget_ref['label_output'].config(text='Files selected')
         self.widget_ref['label_satus'].config(text='Status :')
@@ -486,9 +484,7 @@ class Application():
             )
 
         # choose files
-        directory = path.dirname(path.dirname(__file__))
-        data_folder = self.converter.get_data_folder()
-        path_to_folder = path.join(directory, data_folder)
+        path_to_folder = self.converter.get_data_path()
         file_tuple = fd.askopenfilenames(
             parent=self.widget_ref['window'], title='Choose files',
             initialdir=path_to_folder, filetypes=filetypes
@@ -496,7 +492,7 @@ class Application():
         if file_tuple :
             self.sat_file_tuple = file_tuple
             self.folder = conv.path_tail(path.dirname(file_tuple[0]))
-            if self.folder == data_folder :
+            if self.folder == self.converter.get_data_folder() :
                 self.folder = None
             self.nb_dimacs = len(self.sat_file_tuple)
             self.update_selected_files()
@@ -510,20 +506,19 @@ class Application():
         Return : None
         """
         # choose a directory
-        directory = path.dirname(path.dirname(__file__))
-        path_to_folder = path.join(directory, 'saves')
+        path_to_folder = self.converter.get_save_path()
         folder = fd.askdirectory(
             parent=self.widget_ref['window'], title='Choose a folder',
             initialdir=path_to_folder
             )
         # Reset the file list because a folder is asked
         self.ilp_file_tuple = ()
-        if folder == '' or conv.path_tail(folder) == 'saves':
+        if folder == '' or conv.path_tail(folder) == self.converter.get_save_folder() :
             self.folder = None
-            self.nb_ilp = len(files_only_from_folder(path_to_folder))
+            self.nb_ilp = len(files_from_folder(path_to_folder))
         else :
             self.folder = conv.path_tail(folder)
-            self.nb_ilp = len(files_only_from_folder(folder))
+            self.nb_ilp = len(files_from_folder(folder))
         self.converter.ilp_from_folder(self.folder)
         self.update_selected_files()
         self.widget_ref['label_output'].config(text='Files selected')
@@ -541,9 +536,7 @@ class Application():
             )
 
         # choose files
-        directory = path.dirname(path.dirname(__file__))
-        save_folder = self.converter.get_save_folder()
-        path_to_folder = path.join(directory, save_folder)
+        path_to_folder = self.converter.get_save_path()
         file_tuple = fd.askopenfilenames(
             parent=self.widget_ref['window'], title='Choose files',
             initialdir=path_to_folder, filetypes=filetypes
@@ -551,11 +544,11 @@ class Application():
         if file_tuple :
             self.ilp_file_tuple = file_tuple
             self.folder = conv.path_tail(path.dirname(file_tuple[0]))
-            if self.folder == save_folder :
+            if self.folder == self.converter.get_save_folder() :
                 self.folder = None
             for file_name in file_tuple :
                 self.converter.ilp_from_file(
-                    conv.path_tail(file_name), optional_dir=self.folder
+                    conv.path_tail(file_name), option_folder=self.folder
                     )
             self.nb_ilp = len(self.ilp_file_tuple)
             self.update_selected_files()
@@ -644,7 +637,7 @@ class Application():
                 path_to_folder = path.join(directory, save_folder)
                 if self.folder is not None :
                     path_to_folder = path.join(path_to_folder, self.folder)
-                for file_name in files_only_from_folder(path_to_folder) :
+                for file_name in files_from_folder(path_to_folder) :
                     file_list.append(file_name)
             self.histogram = Histogram(
                 self.converter, file_list, select_solver_list
@@ -661,7 +654,11 @@ class Application():
             self.widget_ref['label_satus'].config(text=text)
 
 
-def files_only_from_folder(path_to_folder):
+def files_from_folder(path_to_folder):
+    """
+    Brief : Get all files from a folder path
+    Return : The files in a list
+    """
     return [file for file in os.listdir(path_to_folder) \
             if os.path.isfile(os.path.join(path_to_folder, file))]
 
