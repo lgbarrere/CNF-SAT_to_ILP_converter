@@ -15,6 +15,7 @@ from enum import Enum, auto
 import numpy as np
 import matplotlib.pyplot as plt
 
+from sat_manager import SatManager
 import converter as conv
 from converter import PulpConverter
 
@@ -35,20 +36,28 @@ class Color(Enum):
     LIGHT_GREY = '#E5E5E5'
 
 
+class ProblemData:
+    """
+    Brief : Define the data used by the application
+    """
+    pass
+
+
 class Histogram:
     """
     Brief : Create a histogram of the execution time for each solver
     """
-    def __init__(self, converter, file_tuple, solver_list):
+    def __init__(self, sat_manager, converter, sat_file_list, ilp_file_list, sat_solver_list, ilp_solver_list):
         self.title = 'Solver execution time'
         self.x_label = 'Solver and ILP'
         self.y_label = 'Execution time'
         self.fig = None
+        self.sat_manager = sat_manager
         self.converter = converter
-        self.file_list = []
-        for file in file_tuple :
-            self.file_list.append(conv.path_tail(file))
-        self.solver_list = solver_list
+        self.sat_file_list = sat_file_list
+        self.ilp_file_list = ilp_file_list
+        self.sat_solver_list = sat_solver_list
+        self.ilp_solver_list = ilp_solver_list
 
 
     def show(self):
@@ -60,32 +69,60 @@ class Histogram:
         label_list = []
         solver_time_dict = {}
 
-        for solver in self.solver_list :
+        for solver in self.sat_solver_list :
             solver_time_dict[solver] = []
 
-        for file in self.file_list :
-            label_list.append(file)
-            for solver in self.solver_list :
+        for solver in self.ilp_solver_list :
+            solver_time_dict[solver] = []
+
+        for file in self.sat_file_list :
+            file = conv.path_tail(file)
+            if file not in label_list :
+                label_list.append(file)
+            for solver in self.sat_solver_list :
+                info = self.sat_manager.get_problem(file).get_solver_info(solver)
+                #solver_time_dict[solver].append(info.get_time())
+                solver_time_dict[solver].append(1)
+
+        for file in self.ilp_file_list :
+            file = conv.path_tail(file)
+            if file not in label_list :
+                label_list.append(file)
+            for solver in self.ilp_solver_list :
                 info = self.converter.get_problem(file).get_solver_info(solver)
                 solver_time_dict[solver].append(info.get_time())
 
         label_len = len(label_list)
-        nb_solvers = len(self.solver_list)
-        x_list = np.arange(label_len)  # The label locations
-        width = 0.8/nb_solvers
+        nb_sat_solvers = len(self.sat_solver_list)
+        nb_ilp_solvers = len(self.ilp_solver_list)
+        nb_sat_files = len(self.sat_file_list)
+        nb_ilp_files = len(self.ilp_file_list)
+        x_list = np.arange(label_len) # The label locations
+        width = 0.8/(nb_sat_solvers + nb_ilp_solvers)
 
         # Plot build
         self.fig, axis_x = plt.subplots()
         rect_list = []
+        
         i = 0
+        if nb_sat_files > 0 :
+            for solver in self.sat_solver_list :
+                pos_list = x_list[:nb_sat_files] + i * width - nb_sat_solvers * (width / 2)
+                rect = axis_x.bar(
+                    pos_list, solver_time_dict[solver], width, label=solver
+                    )
+                rect_list.append(rect)
+                i += 1
 
-        for solver in self.solver_list :
-            pos_list = x_list + i * width - (nb_solvers - 1) * (width / 2)
-            rect = axis_x.bar(
-                pos_list, solver_time_dict[solver], width, label=solver
-                )
-            rect_list.append(rect)
-            i += 1
+        i = 0
+        if nb_ilp_files > 0 :
+            for solver in self.ilp_solver_list :
+                pos_list = x_list[-nb_ilp_files:] + i * width - (nb_ilp_solvers - 2) * (width / 2)
+                rect = axis_x.bar(
+                    pos_list, solver_time_dict[solver], width, label=solver
+                    )
+                rect_list.append(rect)
+                i += 1
 
         # Add some text for labels, title and custom x-axis tick labels, etc.
         axis_x.set_ylabel(self.y_label)
@@ -107,11 +144,14 @@ class Application():
     __FONT_THEME = 'Arial'
 
     def __init__(self):
+        # SAT manager
+        self.sat_manager = SatManager()
         # Converter
         self.converter = PulpConverter()
         self.sat_file_tuple = ()
         self.ilp_file_tuple = ()
-        self.folder = None
+        self.sat_folder = None
+        self.ilp_folder = None
         self.nb_dimacs = 0
         self.nb_ilp = 0
         # Histogram
@@ -128,20 +168,19 @@ class Application():
         self.widget_ref['window'] = window
         #self.window.iconbitmap('logo.ico')
         window.title('SAT-ILP converter')
-        window.geometry('640x480')
-        window.minsize(640, 480)
+        window.geometry('1200x700')
+        window.minsize(1200, 700)
         window.config(bg=self.bg_color)
         # Configurations
         self.radiobutton_var = tk.IntVar()
         self.radiobutton_var.set(1) # Set to dark theme
-        self.checkbox_var = []
+        self.sat_checkbox_var = []
+        self.ilp_checkbox_var = []
         # Frames
         header_frame = tk.Frame(
             window, bg=self.bg_color, width=580, height=180
             )
         self.widget_ref['header_frame'] = header_frame
-        main_frame = tk.Frame(window, bg=self.bg_color)
-        self.widget_ref['main_frame'] = main_frame
         # Components
         self.create_widgets()
 
@@ -153,8 +192,12 @@ class Application():
         """
         self.create_menu()
         self.header_component()
-        self.left_component()
-        self.right_component()
+        self.main_component()
+        self.solver_component()
+        self.dimacs_component()
+        self.separator()
+        self.ilp_component()
+        self.result_component()
 
 
     def create_menu(self):
@@ -207,53 +250,149 @@ class Application():
             fg=self.fg_color
             )
         self.widget_ref['label_title'] = label_title
+        # Display
+        self.widget_ref['header_frame'].pack()
+        label_title.pack(pady=20)
+
+
+    def main_component(self):
+        """
+        Brief : Create the main component (frame)
+        Return : None
+        """
+        main_frame = tk.Frame(self.widget_ref['window'], bg=self.bg_color)
+        self.widget_ref['main_frame'] = main_frame
+        # Display
+        main_frame.pack()
+
+
+    def solver_component(self):
+        """
+        Brief : Create the solver component (frame)
+        Return : None
+        """
+        # Container
+        solver_frame = tk.Frame(
+            self.widget_ref['main_frame'], relief='solid',
+            bg=self.bg_color,
+            highlightbackground=self.fg_color,
+            highlightcolor=self.fg_color, highlightthickness=5
+            )
+        self.widget_ref['solver_frame'] = solver_frame
+
+        # Start solving button
+        solve_button = tk.Button(
+            self.widget_ref['solver_frame'], text='Start solving',
+            font=(self.__FONT_THEME, 16),
+            bg='grey', fg=self.invert_fg_color, command=self.solve_selection
+            )
+        self.widget_ref['solve_button'] = solve_button
+
+        # Display
+        solver_frame.pack(side='left', fill='y', padx=20, ipadx=20)
+        # Solve button
+        solve_button.pack(side='bottom', pady=20)
+
+
+    def dimacs_component(self):
+        """
+        Brief : Create the component to interact with the DIMACS
+        Return : None
+        """
+        # Container
+        sat_frame = tk.Frame(
+            self.widget_ref['solver_frame'], relief='solid',
+            bg=self.bg_color,
+            )
+        self.widget_ref['sat_frame'] = sat_frame
+        sat_header = tk.Frame(
+            self.widget_ref['sat_frame'], relief='solid',
+            bg=self.bg_color,
+            )
+        self.widget_ref['sat_header'] = sat_header
+        # Select label
+        label_sat = tk.Label(
+            sat_frame, text='SAT solvers',
+            font=(self.__FONT_THEME, 20), bg=self.bg_color,
+            fg=self.fg_color
+            )
+        self.widget_ref['label_sat'] = label_sat
         # Tell how many file are selected
         label_sat_selected = tk.Label(
-            self.widget_ref['header_frame'], text='DIMACS files loaded : 0',
+            sat_header, text='DIMACS files : 0',
             font=(self.__FONT_THEME, 16), bg=self.bg_color,
             fg=self.fg_color
             )
         self.widget_ref['label_sat_selected'] = label_sat_selected
         # Convert button
         convert_button = tk.Button(
-            self.widget_ref['header_frame'], text='Convert',
+            sat_header, text='Convert',
             font=(self.__FONT_THEME, 16), bg='grey',
             fg=self.invert_fg_color, command=self.convert_files
             )
         self.widget_ref['convert_button'] = convert_button
+        # Check-boxes
+        check_list = []
+        i = 0
+        for solver in self.sat_manager.get_solvers() :
+            self.sat_checkbox_var.append(tk.IntVar())
+            if i == 0 :
+                self.sat_checkbox_var[i].set(1)
+            button = tk.Checkbutton(
+                sat_frame, font=(self.__FONT_THEME, 14),
+                text=solver, bg=self.bg_color,
+                fg=self.fg_color, bd=0,
+                selectcolor=self.bg_color,
+                activebackground=self.bg_color,
+                activeforeground=self.fg_color,
+                variable=self.sat_checkbox_var[i], onvalue=1, offvalue=0,
+                )
+            check_list.append(button)
+            self.widget_ref[solver] = button
+            i += 1
         # Display
-        self.widget_ref['header_frame'].pack_propagate(0)
-        self.widget_ref['header_frame'].pack()
-        label_title.pack(side='top', pady=20)
-        label_sat_selected.pack(side='top', anchor='w')
-        self.widget_ref['convert_button'].pack(
-            side='top', anchor='w', pady=(10,0)
+        sat_frame.pack(side='left', anchor='w', fill='y', ipadx=20)
+        label_sat.pack(pady=10)
+        sat_header.pack(anchor='w', fill='x')
+        label_sat_selected.pack(side='left', padx=(10, 0))
+        convert_button.pack(side='right', padx=(0, 20))
+        for check in check_list :
+            check.pack(anchor='w', padx=(10, 0))
+
+
+    def separator(self):
+        """
+        Brief : Create a line separator between solver component's widgets
+        Return : None
+        """
+        separator = tk.Frame(
+            self.widget_ref['solver_frame'], relief='solid',
+            bg=self.invert_bg_color, width=5, height=400
             )
-        self.widget_ref['main_frame'].pack(expand=True, side='top')
+        self.widget_ref['separator'] = separator
+        separator.pack(side='left', expand=True)
 
 
-    def left_component(self):
+    def ilp_component(self):
         """
         Brief : Create the left component containing the solver selection
         Return : None
         """
         # Container
-        select_frame = tk.Frame(
-            self.widget_ref['main_frame'], relief='solid',
+        ilp_frame = tk.Frame(
+            self.widget_ref['solver_frame'], relief='solid',
             bg=self.bg_color,
-            highlightbackground=self.fg_color,
-            highlightcolor=self.fg_color, highlightthickness=5
             )
-        self.widget_ref['select_frame'] = select_frame
+        self.widget_ref['ilp_frame'] = ilp_frame
         # Select label
         label_solver = tk.Label(
-            select_frame, text='Solver check-boxes',
+            ilp_frame, text='ILP solvers',
             font=(self.__FONT_THEME, 20), bg=self.bg_color,
             fg=self.fg_color
             )
         self.widget_ref['label_solver'] = label_solver
         label_ilp_selected = tk.Label(
-            select_frame, text='ILP files : 0',
+            ilp_frame, text='ILP files : 0',
             font=(self.__FONT_THEME, 16), bg=self.bg_color,
             fg=self.fg_color
             )
@@ -262,38 +401,30 @@ class Application():
         check_list = []
         i = 0
         for solver in self.converter.get_solvers() :
-            self.checkbox_var.append(tk.IntVar())
+            self.ilp_checkbox_var.append(tk.IntVar())
             if i == 0 :
-                self.checkbox_var[i].set(1)
+                self.ilp_checkbox_var[i].set(1)
             button = tk.Checkbutton(
-                select_frame, font=(self.__FONT_THEME, 14),
+                ilp_frame, font=(self.__FONT_THEME, 14),
                 text=solver, bg=self.bg_color,
                 fg=self.fg_color, bd=0,
                 selectcolor=self.bg_color,
                 activebackground=self.bg_color,
                 activeforeground=self.fg_color,
-                variable=self.checkbox_var[i], onvalue=1, offvalue=0,
+                variable=self.ilp_checkbox_var[i], onvalue=1, offvalue=0,
                 )
             check_list.append(button)
             self.widget_ref[solver] = button
             i += 1
-
-        # Start solving button
-        solve_button = tk.Button(
-            select_frame, text='Start solving', font=(self.__FONT_THEME, 16),
-            bg='grey', fg=self.invert_fg_color, command=self.solve_selection
-            )
-        self.widget_ref['solve_button'] = solve_button
         # Display
-        select_frame.pack(side='left', fill='y', padx=(0, 20), ipadx=20)
-        label_solver.pack(side='top', pady=10)
-        label_ilp_selected.pack(side='top', anchor='w', padx=(10, 0))
+        ilp_frame.pack(side='right', anchor='c', fill='y', ipadx=20)
+        label_solver.pack(pady=10)
+        label_ilp_selected.pack(anchor='w', padx=(10, 0))
         for check in check_list:
-            check.pack(anchor='w', side='top', padx=10, pady=5)
-        solve_button.pack(side='bottom', pady=20)
+            check.pack(anchor='w', padx=(10, 0))
 
 
-    def right_component(self):
+    def result_component(self):
         """
         Brief : Create the rigth component containing the output display
         Return : None
@@ -312,8 +443,9 @@ class Application():
             fg=self.fg_color
             )
         self.widget_ref['label_result'] = label_result
+        # Output display area
         output_frame = tk.Frame(
-            result_frame, bg=self.invert_bg_color, width=200, height=60
+            result_frame, bg=self.invert_bg_color, width=200, height=80
             )
         self.widget_ref['output_frame'] = output_frame
         label_output = tk.Label(
@@ -340,14 +472,14 @@ class Application():
             )
         self.widget_ref['solution_button'] = solution_button
         # Display
-        result_frame.pack(side='right', fill='y', padx=(20, 0), ipadx=20)
-        label_result.pack(side='top', pady=10)
+        result_frame.pack(side='right', fill='y', padx=20, ipadx=20)
+        label_result.pack(pady=10)
         output_frame.pack_propagate(0)
-        output_frame.pack(side='top')
-        label_output.pack(side='top', anchor='w')
-        label_satus.pack(side='top', pady=5)
-        histogram_button.pack(anchor='s', side='left', pady=20, expand=True)
-        solution_button.pack(anchor='s', side='right', pady=20, expand=True)
+        output_frame.pack()
+        label_output.pack(anchor='w')
+        label_satus.pack(pady=5)
+        histogram_button.pack(side='left', anchor='n', pady=20, expand=True)
+        solution_button.pack(side='right', anchor='n', pady=20, expand=True)
 
 
     def switch_theme(self):
@@ -389,7 +521,7 @@ class Application():
             bg=self.bg_color, fg=self.fg_color
             )
         # Left component
-        self.widget_ref['select_frame'].config(
+        self.widget_ref['ilp_frame'].config(
             bg=self.bg_color,
             highlightbackground=self.fg_color,
             highlightcolor=self.fg_color
@@ -442,34 +574,10 @@ class Application():
         Brief : Update selection file labels
         Return : None
         """
-        sat_text = 'DIMACS files loaded : ' + str(self.nb_dimacs)
+        sat_text = 'DIMACS files : ' + str(self.nb_dimacs)
         self.widget_ref['label_sat_selected'].config(text=sat_text)
         ilp_text = 'ILP files : ' + str(self.nb_ilp)
         self.widget_ref['label_ilp_selected'].config(text=ilp_text)
-
-
-    def get_dimacs_folder(self):
-        """
-        Brief : Ask the user to select a folder to get all DIAMCS files in
-        Return : None
-        """
-        # choose a directory
-        path_to_folder = self.converter.get_data_path()
-        folder = fd.askdirectory(
-            parent=self.widget_ref['window'], title='Choose a folder',
-            initialdir=path_to_folder
-            )
-        # Reset the file list because a folder is asked
-        self.sat_file_tuple = ()
-        if folder == '' or conv.path_tail(folder) == self.converter.get_data_folder() :
-            self.folder = None
-            self.nb_dimacs = len(files_from_folder(path_to_folder))
-        else :
-            self.folder = conv.path_tail(folder)
-            self.nb_dimacs = len(files_from_folder(folder))
-        self.update_selected_files()
-        self.widget_ref['label_output'].config(text='Files selected')
-        self.widget_ref['label_satus'].config(text='Status :')
 
 
     def get_dimacs_files(self):
@@ -491,35 +599,38 @@ class Application():
             )
         if file_tuple :
             self.sat_file_tuple = file_tuple
-            self.folder = conv.path_tail(path.dirname(file_tuple[0]))
-            if self.folder == self.converter.get_data_folder() :
-                self.folder = None
+            self.sat_folder = conv.path_tail(path.dirname(file_tuple[0]))
+            if self.sat_folder == self.converter.get_data_folder() :
+                self.sat_folder = None
+            for file_name in file_tuple :
+                file_name = conv.path_tail(file_name)
+                self.sat_manager.load_file(file_name, self.sat_folder)
             self.nb_dimacs = len(self.sat_file_tuple)
             self.update_selected_files()
             self.widget_ref['label_output'].config(text='Files selected')
             self.widget_ref['label_satus'].config(text='Status :')
 
 
-    def get_ilp_folder(self):
+    def get_dimacs_folder(self):
         """
-        Brief : Ask the user to select a folder to get all ILP files in
+        Brief : Ask the user to select a folder to get all DIMACS files in
         Return : None
         """
         # choose a directory
-        path_to_folder = self.converter.get_save_path()
+        path_to_folder = self.converter.get_data_path()
         folder = fd.askdirectory(
             parent=self.widget_ref['window'], title='Choose a folder',
             initialdir=path_to_folder
             )
         # Reset the file list because a folder is asked
-        self.ilp_file_tuple = ()
-        if folder == '' or conv.path_tail(folder) == self.converter.get_save_folder() :
-            self.folder = None
-            self.nb_ilp = len(files_from_folder(path_to_folder))
+        self.sat_file_tuple = ()
+        if folder == '' or conv.path_tail(folder) == self.converter.get_data_folder() :
+            self.sat_folder = None
+            self.nb_dimacs = len(files_from_folder(path_to_folder))
         else :
-            self.folder = conv.path_tail(folder)
-            self.nb_ilp = len(files_from_folder(folder))
-        self.converter.ilp_from_folder(self.folder)
+            self.sat_folder = conv.path_tail(folder)
+            self.nb_dimacs = len(files_from_folder(folder))
+        self.sat_manager.load_folder(self.sat_folder)
         self.update_selected_files()
         self.widget_ref['label_output'].config(text='Files selected')
         self.widget_ref['label_satus'].config(text='Status :')
@@ -543,17 +654,42 @@ class Application():
             )
         if file_tuple :
             self.ilp_file_tuple = file_tuple
-            self.folder = conv.path_tail(path.dirname(file_tuple[0]))
-            if self.folder == self.converter.get_save_folder() :
-                self.folder = None
+            self.ilp_folder = conv.path_tail(path.dirname(file_tuple[0]))
+            if self.ilp_folder == self.converter.get_save_folder() :
+                self.ilp_folder = None
             for file_name in file_tuple :
                 self.converter.ilp_from_file(
-                    conv.path_tail(file_name), option_folder=self.folder
+                    conv.path_tail(file_name), option_folder=self.ilp_folder
                     )
             self.nb_ilp = len(self.ilp_file_tuple)
             self.update_selected_files()
             self.widget_ref['label_output'].config(text='Files selected')
             self.widget_ref['label_satus'].config(text='Status :')
+
+
+    def get_ilp_folder(self):
+        """
+        Brief : Ask the user to select a folder to get all ILP files in
+        Return : None
+        """
+        # choose a directory
+        path_to_folder = self.converter.get_save_path()
+        folder = fd.askdirectory(
+            parent=self.widget_ref['window'], title='Choose a folder',
+            initialdir=path_to_folder
+            )
+        # Reset the file list because a folder is asked
+        self.ilp_file_tuple = ()
+        if folder == '' or conv.path_tail(folder) == self.converter.get_save_folder() :
+            self.ilp_folder = None
+            self.nb_ilp = len(files_from_folder(path_to_folder))
+        else :
+            self.ilp_folder = conv.path_tail(folder)
+            self.nb_ilp = len(files_from_folder(folder))
+        self.converter.ilp_from_folder(self.ilp_folder)
+        self.update_selected_files()
+        self.widget_ref['label_output'].config(text='Files selected')
+        self.widget_ref['label_satus'].config(text='Status :')
 
 
     def convert_files(self):
@@ -566,17 +702,16 @@ class Application():
             return
         # Otherwise, check if we loaded a folder or some files
         if not self.sat_file_tuple :
-            self.converter.convert_from_folder(self.folder)
-            self.converter.save_all_in_folder(self.folder)
+            self.converter.convert_from_folder(self.sat_folder)
+            self.converter.save_all_in_folder(self.ilp_folder)
         else :
             for file in self.sat_file_tuple :
                 file = conv.path_tail(file)
-                self.converter.convert_from_file(file, self.folder)
-                self.converter.save_ilp_in_file(file, self.folder)
+                self.converter.convert_from_file(file, self.sat_folder)
+                self.converter.save_ilp_in_file(file, self.ilp_folder)
         # Update selected files
         self.ilp_file_tuple = self.sat_file_tuple
         self.nb_ilp = self.nb_dimacs
-        self.nb_dimacs = 0
         self.update_selected_files()
         self.widget_ref['label_output'].config(text='Files converted')
 
@@ -586,61 +721,111 @@ class Application():
         Brief : Solve selected ILP file with selected solvers
         Return : None
         """
-        if self.nb_ilp == 0 :
+        if self.nb_dimacs == 0 and self.nb_ilp == 0 :
             return
-        if self.ilp_file_tuple :
-            for file in self.ilp_file_tuple :
-                file_name = conv.path_tail(file)
-                self.converter.define_problem(file_name)
-        else :
-            self.converter.define_problem_from_folder(self.folder)
+        if self.nb_ilp > 0 :
+            if self.ilp_file_tuple :
+                for file in self.ilp_file_tuple :
+                    file_name = conv.path_tail(file)
+                    self.converter.define_problem(file_name)
+            else :
+                self.converter.define_problem_from_folder(self.ilp_folder)
         self.widget_ref['label_output'].config(text='Solving')
         self.widget_ref['label_satus'].config(text='Status :')
         self.widget_ref['window'].update()
-        i = 0
         solve_try = False
-        select_solver_list = []
+        sat_solver_list = []
+        ilp_solver_list = []
 
-        for solver in self.converter.get_solvers() :
-            if self.checkbox_var[i].get() == 1 :
-                select_solver_list.append(solver)
-                if self.ilp_file_tuple :
-                    for file in self.ilp_file_tuple :
-                        file = conv.path_tail(file)
-                        self.converter.solve(file, solver)
+        # Solve CNF-SAT
+        i = 0
+        for solver in self.sat_manager.get_solvers() :
+            if self.sat_checkbox_var[i].get() == 1 :
+                sat_solver_list.append(solver)
+                if self.nb_dimacs > 0 :
+                    if self.sat_file_tuple :
+                        for file in self.sat_file_tuple :
+                            file = conv.path_tail(file)
+                            self.sat_manager.solve(
+                                file_name=file, solver_name=solver
+                                )
+                            self.widget_ref['label_output'].config(
+                                text='Finished solving'
+                                )
+                            problem = self.sat_manager.get_problem(file)
+                            solution = problem.get_solver_info(solver).get_solution()
+                            text = 'Status : ' + str(solution)
+                            self.widget_ref['label_satus'].config(text=text)
+                    else :
+                        self.sat_manager.solve_folder(
+                            folder=self.sat_folder, solver_name=solver
+                            )
                         self.widget_ref['label_output'].config(
                             text='Finished solving'
                             )
-                        problem = self.converter.get_problem(file)
-                        status = problem.get_solver_info(solver).get_status()
-                        text = 'Status : ' + status
+                        text = 'Status : Solved all'
                         self.widget_ref['label_satus'].config(text=text)
-                else :
-                    self.converter.solve_folder(
-                        self.folder, solver
-                        )
-                    self.widget_ref['label_output'].config(
-                        text='Finished solving'
-                        )
-                    text = 'Status : Solved all'
-                    self.widget_ref['label_satus'].config(text=text)
                 solve_try = True
             i += 1
 
+        # Solve ILP
+        i = 0
+        for solver in self.converter.get_solvers() :
+            if self.ilp_checkbox_var[i].get() == 1 :
+                ilp_solver_list.append(solver)
+                if self.nb_ilp > 0 :
+                    if self.ilp_file_tuple :
+                        for file in self.ilp_file_tuple :
+                            file = conv.path_tail(file)
+                            self.converter.solve(file, solver)
+                            self.widget_ref['label_output'].config(
+                                text='Finished solving'
+                                )
+                            problem = self.converter.get_problem(file)
+                            status = problem.get_solver_info(solver).get_status()
+                            text = 'Status : ' + status
+                            self.widget_ref['label_satus'].config(text=text)
+                    else :
+                        self.converter.solve_folder(
+                            self.ilp_folder, solver
+                            )
+                        self.widget_ref['label_output'].config(
+                            text='Finished solving'
+                            )
+                        text = 'Status : Solved all'
+                        self.widget_ref['label_satus'].config(text=text)
+                    solve_try = True
+            i += 1
+
         if solve_try :
-            file_list = []
-            if self.ilp_file_tuple :
-                file_list = self.ilp_file_tuple
-            else :
-                directory = path.dirname(path.dirname(__file__))
-                save_folder = self.converter.get_save_folder()
-                path_to_folder = path.join(directory, save_folder)
-                if self.folder is not None :
-                    path_to_folder = path.join(path_to_folder, self.folder)
-                for file_name in files_from_folder(path_to_folder) :
-                    file_list.append(file_name)
+            sat_file_list = []
+            ilp_file_list = []
+            if self.nb_dimacs > 0 :
+                if self.sat_file_tuple :
+                    sat_file_list = self.sat_file_tuple
+                else :
+                    directory = path.dirname(path.dirname(__file__))
+                    save_folder = self.converter.get_save_folder()
+                    path_to_folder = path.join(directory, save_folder)
+                    if self.sat_folder is not None :
+                        path_to_folder = path.join(path_to_folder, self.sat_folder)
+                    for file_name in files_from_folder(path_to_folder) :
+                        sat_file_list.append(file_name)
+            if self.nb_ilp > 0 :
+                if self.ilp_file_tuple :
+                    ilp_file_list = self.ilp_file_tuple
+                else :
+                    directory = path.dirname(path.dirname(__file__))
+                    save_folder = self.converter.get_save_folder()
+                    path_to_folder = path.join(directory, save_folder)
+                    if self.ilp_folder is not None :
+                        path_to_folder = path.join(path_to_folder, self.ilp_folder)
+                    for file_name in files_from_folder(path_to_folder) :
+                        ilp_file_list.append(file_name)
+            # Histogram calculation
             self.histogram = Histogram(
-                self.converter, file_list, select_solver_list
+                self.sat_manager, self.converter, sat_file_list,
+                ilp_file_list, sat_solver_list, ilp_solver_list
                 )
             self.widget_ref['histogram_button'].config(
                 command=self.histogram.show

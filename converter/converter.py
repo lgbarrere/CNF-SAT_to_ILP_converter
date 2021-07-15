@@ -6,8 +6,6 @@ File : converter.py
 Author : lgbarrere
 Brief : To convert a CNF-SAT formula into its ILP version
 """
-
-
 import os
 from os import path
 from os.path import isfile, join
@@ -582,7 +580,7 @@ class Converter(Constants):
 
 class SolverInformation:
     """
-    Brief : Get for a given solver what is its information
+    Brief : Give solver information
     """
     def __init__(self, solver=None, status=pulp.LpStatusUndefined):
         self.solver = solver
