@@ -68,6 +68,7 @@ class Histogram:
         # Initialisations
         label_list = []
         solver_time_dict = {}
+        label_time_dict = {}
 
         for solver in self.sat_solver_list :
             solver_time_dict[solver] = []
@@ -77,54 +78,64 @@ class Histogram:
 
         for file in self.sat_file_list :
             file = conv.path_tail(file)
-            if file not in label_list :
-                label_list.append(file)
+            problem_name = path.splitext(file)[0]
+            if problem_name not in label_list :
+                label_list.append(problem_name)
+                label_time_dict[problem_name] = {}
             for solver in self.sat_solver_list :
                 info = self.sat_manager.get_problem(file).get_solver_info(solver)
                 #solver_time_dict[solver].append(info.get_time())
                 solver_time_dict[solver].append(1)
+                label_time_dict[problem_name][solver] = 1
 
         for file in self.ilp_file_list :
             file = conv.path_tail(file)
-            if file not in label_list :
-                label_list.append(file)
+            problem_name = path.splitext(file)[0]
+            if problem_name not in label_list :
+                label_list.append(problem_name)
+                label_time_dict[problem_name] = {}
             for solver in self.ilp_solver_list :
                 info = self.converter.get_problem(file).get_solver_info(solver)
                 solver_time_dict[solver].append(info.get_time())
+                label_time_dict[problem_name][solver] = info.get_time()
 
         label_len = len(label_list)
+        label_time_len = len(label_time_dict)
         nb_sat_solvers = len(self.sat_solver_list)
         nb_ilp_solvers = len(self.ilp_solver_list)
         nb_sat_files = len(self.sat_file_list)
         nb_ilp_files = len(self.ilp_file_list)
-        x_list = np.arange(label_len) # The label locations
+        x_list = np.arange(label_time_len) # Label locations
         width = 0.8/(nb_sat_solvers + nb_ilp_solvers)
 
         # Plot build
         self.fig, axis_x = plt.subplots()
         rect_list = []
+
+        # Calculus of positions
+        i_list = {}
+        for solver in solver_time_dict :
+            i_list[solver] = []
         
-        i = 0
-        if nb_sat_files > 0 :
-            for solver in self.sat_solver_list :
-                pos_list = x_list[:nb_sat_files] + i * width - nb_sat_solvers * (width / 2)
+        prob_num = 0
+        for problem_name in label_time_dict :
+            tmp = 0
+            for solver in label_time_dict[problem_name] :
+                nb_time = len(label_time_dict[problem_name])
+                i_list[solver].append(x_list[prob_num] + (tmp - ((nb_time - 1) / 2)) * width)
+                tmp += 1
+            prob_num += 1
+
+        # Make bars
+        for solver in solver_time_dict :
+            nb_time = len(solver_time_dict[solver])
+            if solver in i_list :
                 rect = axis_x.bar(
-                    pos_list, solver_time_dict[solver], width, label=solver
+                    i_list[solver], solver_time_dict[solver], width, label=solver
                     )
                 rect_list.append(rect)
-                i += 1
 
-        i = 0
-        if nb_ilp_files > 0 :
-            for solver in self.ilp_solver_list :
-                pos_list = x_list[-nb_ilp_files:] + i * width - (nb_ilp_solvers - 2) * (width / 2)
-                rect = axis_x.bar(
-                    pos_list, solver_time_dict[solver], width, label=solver
-                    )
-                rect_list.append(rect)
-                i += 1
-
-        # Add some text for labels, title and custom x-axis tick labels, etc.
+        # Add y-axis texts, title, custom x-axis tick labels and a legend
         axis_x.set_ylabel(self.y_label)
         axis_x.set_title(self.title)
         axis_x.set_xticks(x_list)
