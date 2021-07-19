@@ -180,10 +180,13 @@ class SatManager:
             if cnf is None :
                 cnf = problem.cnf
             with Solver(
-                name=solver_name, bootstrap_with=cnf.clauses
+                name=solver_name, bootstrap_with=cnf.clauses, use_timer=True
                 ) as solver :
+                print(solver_name)
                 info.solution = solver.solve()
                 info.model = solver.get_model()
+                info.time = solver.time()
+                print(info.time)
 
 
     def solve_folder(self, folder, solver_name='Cadical'):

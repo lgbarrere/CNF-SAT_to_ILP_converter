@@ -84,9 +84,8 @@ class Histogram:
                 label_time_dict[problem_name] = {}
             for solver in self.sat_solver_list :
                 info = self.sat_manager.get_problem(file).get_solver_info(solver)
-                #solver_time_dict[solver].append(info.get_time())
-                solver_time_dict[solver].append(1)
-                label_time_dict[problem_name][solver] = 1
+                solver_time_dict[solver].append(info.get_time())
+                label_time_dict[problem_name][solver] = info.get_time()
 
         for file in self.ilp_file_list :
             file = conv.path_tail(file)
