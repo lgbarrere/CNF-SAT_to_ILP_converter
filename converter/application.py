@@ -84,7 +84,7 @@ class Histogram:
                 label_time_dict[problem_name] = {}
             for solver in self.sat_solver_list :
                 info = self.sat_manager.get_problem(file).get_solver_info(solver)
-                solver_time_dict[solver].append(info.get_time())
+                solver_time_dict[solver].append(round(info.get_time(), 2))
                 label_time_dict[problem_name][solver] = info.get_time()
 
         for file in self.ilp_file_list :
@@ -95,7 +95,7 @@ class Histogram:
                 label_time_dict[problem_name] = {}
             for solver in self.ilp_solver_list :
                 info = self.converter.get_problem(file).get_solver_info(solver)
-                solver_time_dict[solver].append(info.get_time())
+                solver_time_dict[solver].append(round(info.get_time(), 2))
                 label_time_dict[problem_name][solver] = info.get_time()
 
         label_len = len(label_list)
@@ -530,7 +530,37 @@ class Application():
         self.widget_ref['label_sat_selected'].config(
             bg=self.bg_color, fg=self.fg_color
             )
-        # Left component
+        # Solvers component
+        self.widget_ref['solver_frame'].config(
+            bg=self.bg_color,
+            highlightbackground=self.fg_color,
+            highlightcolor=self.fg_color
+            )
+        # Dimacs component
+        self.widget_ref['sat_frame'].config(
+            bg=self.bg_color
+            )
+        self.widget_ref['sat_header'].config(
+            bg=self.bg_color
+            )
+        self.widget_ref['label_sat'].config(
+            bg=self.bg_color, fg=self.fg_color
+            )
+        self.widget_ref['label_sat_selected'].config(
+            bg=self.bg_color, fg=self.fg_color
+            )
+        for solver in self.sat_manager.get_solvers() :
+            self.widget_ref[solver].config(
+                bg=self.bg_color, fg=self.fg_color,
+                selectcolor=self.bg_color,
+                activebackground=self.bg_color,
+                activeforeground=self.fg_color
+                )
+        # Separator
+        self.widget_ref['separator'].config(
+            bg=self.invert_bg_color
+            )
+        # ILP component
         self.widget_ref['ilp_frame'].config(
             bg=self.bg_color,
             highlightbackground=self.fg_color,
@@ -544,15 +574,11 @@ class Application():
             )
         for text in self.converter.get_solvers() :
             self.widget_ref[text].config(
-                bg=self.bg_color,
-                fg=self.fg_color, bd=0,
+                bg=self.bg_color, fg=self.fg_color,
                 selectcolor=self.bg_color,
                 activebackground=self.bg_color,
                 activeforeground=self.fg_color
                 )
-        self.widget_ref['solve_button'].config(
-            bg='grey', fg=self.invert_fg_color
-            )
         # Right component
         self.widget_ref['result_frame'].config(
             bg=self.bg_color,
@@ -570,12 +596,6 @@ class Application():
             )
         self.widget_ref['label_satus'].config(
             bg=self.bg_color, fg=self.fg_color
-            )
-        self.widget_ref['histogram_button'].config(
-            bg='grey', fg=self.invert_fg_color
-            )
-        self.widget_ref['solution_button'].config(
-            bg='grey', fg=self.invert_fg_color
             )
 
 

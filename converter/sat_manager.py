@@ -81,10 +81,13 @@ class SatManager:
 
 
     def __init__(self):
+        # List of every available solvers
+        # Note : MapleCM, Minicard, Minisat22 and Minisat-gh not used here
+        # because they seem to have a bug that occurs sometimes
+        # if used after another use of a solver
         self.__avail_solver_list = [
             'Cadical', 'Gluecard3', 'Gluecard4', 'Glucose3',
-            'Glucose4', 'Lingeling', 'Maplechrono', 'Maplecm',
-            'Mergesat3', 'Minicard', 'Minisat22', 'Minisat-gh'
+            'Glucose4', 'Lingeling', 'Maplechrono', 'Mergesat3'
             ]
 
         self.problem_dict = {} # file_name : SatInformation
@@ -182,11 +185,9 @@ class SatManager:
             with Solver(
                 name=solver_name, bootstrap_with=cnf.clauses, use_timer=True
                 ) as solver :
-                print(solver_name)
                 info.solution = solver.solve()
                 info.model = solver.get_model()
                 info.time = solver.time()
-                print(info.time)
 
 
     def solve_folder(self, folder, solver_name='Cadical'):
@@ -219,10 +220,11 @@ def main():
     Brief : Test some uses of this library
     Return : None
     """
-
+    # Global test
     sat_manager = SatManager()
     sat_manager.load_folder()
     for file_name in sat_manager.problem_dict :
+        print(file_name)
         for solver_name in sat_manager.get_solvers() :
             sat_manager.solve(file_name=file_name, solver_name=solver_name)
     print(sat_manager)
