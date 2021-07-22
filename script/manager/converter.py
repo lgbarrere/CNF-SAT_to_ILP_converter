@@ -4,74 +4,21 @@
 """
 File : converter.py
 Author : lgbarrere
-Brief : To convert a CNF-SAT formula into its ILP version
+Brief : Convert a CNF-SAT formula into its ILP version
 """
 import os
-from os import path
-from os.path import isfile, join
-from os import listdir
+from os import path, listdir
 import shutil
-from pathlib import Path
 import logging as lg
 import time
 
 import pulp
 
-
-class Constants:
-    """
-    Brief : Constants
-    """
-    __ROOT_FOLDER = path.dirname(path.dirname(__file__)) # Project folder
-    __DATA_FOLDER = 'data' # Folder containing files to convert
-    __SAVE_FOLDER = 'saves' # Folder to save the converted files
-    __RESULT_FOLDER = 'result' # Folder to save ILP solutions
-    __RESULT_FILE = 'result.sol' # File to save ILP solutions
-
-
-    def __init__(self):
-        pass
-
-
-    ## Getters
-    def get_root_folder(self):
-        """
-        Brief : Get the root folder name
-        Return : The root folder name
-        """
-        return self.__ROOT_FOLDER
-
-
-    def get_data_folder(self):
-        """
-        Brief : Get the data folder name
-        Return : The date folder name
-        """
-        return self.__DATA_FOLDER
-
-
-    def get_save_folder(self):
-        """
-        Brief : Get the save folder name
-        Return : The save folder name
-        """
-        return self.__SAVE_FOLDER
-
-
-    def get_result_folder(self):
-        """
-        Brief : Get the result folder name
-        Return : The result folder name
-        """
-        return self.__RESULT_FOLDER
-
-
-    def get_result_file(self):
-        """
-        Brief : Get the result file name
-        Return : The result file name
-        """
-        return self.__RESULT_FILE
+from .utility import Constants
+from .utility import to_ilp_suffix
+from .utility import lines_from_file
+from .utility import split
+from .utility import build_path
 
 
 class ILPFormula:
@@ -199,42 +146,7 @@ class Converter(Constants):
         print(self._formula_dict[to_ilp_suffix(file_name)])
 
 
-    def build_path(self, folder, option_folder = None, file_name = None):
-        """
-        Brief : Build the absolute path to requested folders and a file name
-        Return : The path in a string
-        > folder : The folder the path must reach
-        > option_folder : If given, a folder is added at the end of the path
-        > file_name : If given, a file name is added at the end of the path
-        (after option_folder)
-        """
-        complete_path = path.join(self.get_root_folder(), folder)
-        if option_folder is not None:
-            complete_path = path.join(complete_path, option_folder)
-        if file_name is not None:
-            complete_path = path.join(complete_path, file_name)
-        return complete_path
-
-
-    def get_data_path(self, option_folder = None):
-        """
-        Brief : Get the path to data folder
-        Return : The path in a string
-        > option_folder : If given, a directory is added at the end of the path
-        """
-        return self.build_path(self.get_data_folder(), option_folder)
-
-
-    def get_save_path(self, option_folder = None):
-        """
-        Brief : Get the path to save folder
-        Return : The path in a string
-        > option_folder : If given, a directory is added at the end of the path
-        """
-        return self.build_path(self.get_save_folder(), option_folder)
-
-
-    def __read_dimacs_file(self, file_name, option_folder = None):
+    def __read_dimacs_file(self, file_name, option_folder=None):
         """
         Brief : Get every lines from a dimacs file
         Return : Every lines in a list
@@ -242,13 +154,13 @@ class Converter(Constants):
         > option_folder : If given, search the file in this sub folder
         """
         lg.debug("Reading file %s.", file_name)
-        file_path = self.build_path(
-            self.get_data_folder(), option_folder, file_name
+        file_path = build_path(
+            self.get_data_path(), option_folder, file_name
             )
         return lines_from_file(file_path)
 
 
-    def __read_ilp_file(self, file_name, option_folder = None):
+    def __read_ilp_file(self, file_name, option_folder=None):
         """
         Brief : Get every lines from an ILP file
         Return : Every lines in a list
@@ -256,8 +168,8 @@ class Converter(Constants):
         > option_folder : If given, search the file in this sub folder
         """
         lg.debug("Reading file %s.", file_name)
-        file_path = self.build_path(
-            self.get_save_folder(), option_folder, file_name
+        file_path = build_path(
+            self.get_save_path(), option_folder, file_name
             )
         return lines_from_file(file_path)
 
@@ -332,7 +244,7 @@ class Converter(Constants):
         self.__ilp_string_dict[file_name] = str(formula)
 
 
-    def convert_from_file(self, file_name, option_folder = None):
+    def convert_from_file(self, file_name, option_folder=None):
         """
         Brief : Convert a CNF-SAT formula into ILP from the given file_name
         Return : None
@@ -407,7 +319,7 @@ class Converter(Constants):
         formula.converted = True
 
 
-    def ilp_from_file(self, file_name, option_folder = None):
+    def ilp_from_file(self, file_name, option_folder=None):
         """
         Brief : Load ILP from the given file_name
         Return : None
@@ -426,24 +338,19 @@ class Converter(Constants):
             lg.warning("This ilp file has already been read.")
 
 
-    def ilp_from_folder(self, option_folder = None):
+    def ilp_from_folder(self, option_folder=None):
         """
         Brief : Load all ILP files from the given folder_name
         Return : None
         > option_folder : The name of the folder to convert files from
         """
-        folder_path = self.get_save_path(option_folder)
-
-        if option_folder is None:
-            lg.debug("Reading ILP files in folder %s.", self.get_save_folder())
-        else :
-            relative_path = f'{self.get_save_folder()}/{option_folder}'
-            lg.debug("Reading ILP files in folder %s.", relative_path)
-
+        folder_path = build_path(self.get_save_path(), option_folder)
+        relative_path = build_path(self.get_save_folder(), option_folder)
+        lg.debug("Reading ILP files in folder %s.", relative_path)
         lg.disable(level=lg.DEBUG)
         for file_name in listdir(folder_path):
-            file_path = join(folder_path, file_name)
-            if isfile(file_path):
+            file_path = path.join(folder_path, file_name)
+            if path.isfile(file_path):
                 try:
                     with open(file_path, 'r'):
                         self.ilp_from_file(file_name, option_folder)
@@ -453,24 +360,19 @@ class Converter(Constants):
         lg.debug("Folder read !")
 
 
-    def convert_from_folder(self, option_folder = None):
+    def convert_from_folder(self, option_folder=None):
         """
         Brief : Convert all CNF files into ILP files from the given folder_name
         Return : None
         > option_folder : The name of the folder to convert files from
         """
-        folder_path = self.get_data_path(option_folder)
-
-        if option_folder is None:
-            lg.debug("Converting files in folder %s.", self.get_data_folder())
-        else :
-            relative_path = f'{self.get_data_folder()}/{option_folder}'
-            lg.debug("Converting files in folder %s.", relative_path)
-
+        folder_path = build_path(self.get_data_path(), option_folder)
+        relative_path = build_path(self.get_data_folder(), option_folder)
+        lg.debug("Converting files in folder %s.", relative_path)
         lg.disable(level=lg.DEBUG)
         for file_name in listdir(folder_path):
-            file_path = join(folder_path, file_name)
-            if isfile(file_path):
+            file_path = path.join(folder_path, file_name)
+            if path.isfile(file_path):
                 try:
                     with open(file_path, 'r'):
                         self.convert_from_file(file_name, option_folder)
@@ -480,7 +382,7 @@ class Converter(Constants):
         lg.debug("Folder conversion done !")
 
 
-    def save_ilp_in_file(self, file_name, option_folder = None):
+    def save_ilp_in_file(self, file_name, option_folder=None):
         """
         Brief : Save a converted ILP in a file (created if missing)
         Return : None
@@ -497,14 +399,11 @@ class Converter(Constants):
             return
 
         lg.debug("Saving in file %s.", file_name)
-        directory = path.dirname(path.dirname(__file__))
-        folder_path = path.join(directory, self.get_save_folder())
-        if option_folder is not None:
-            folder_path = path.join(folder_path, option_folder)
+        folder_path = build_path(self.get_save_path(), option_folder)
         file_path = path.join(folder_path, file_name)
         # Create folder and/or file if missing, then save the ILP
         os.makedirs(folder_path, exist_ok=True)
-        if not os.path.isfile(file_path) :
+        if not path.isfile(file_path) :
             with open(file_path, 'w') as file:
                 file.write(self.get_ilp_string(file_name))
             lg.debug("Save done !")
@@ -518,39 +417,31 @@ class Converter(Constants):
         Return : None
         > option_folder : folder to save the files (created if missing)
         """
-        if option_folder is None :
-            lg.debug("Saving all in %s.", self.get_save_folder())
-        else :
-            relative_path = f'{self.get_save_folder()}/{option_folder}'
-            lg.debug("Saving all in %s.", relative_path)
+        relative_path = build_path(self.get_save_folder(), option_folder)
+        lg.debug("Saving all in %s.", relative_path)
         lg.disable(level=lg.DEBUG)
-        for file_name in self._formula_dict :
+        for file_name in self._formula_dict:
             self.save_ilp_in_file(file_name, option_folder)
         lg.disable(level=lg.NOTSET)
         lg.debug("Folder save done !")
 
 
-    def clear_save_folder(self, option_folder = None):
+    def clear_save_folder(self, option_folder=None):
         """
         Brief : Delete all files in the given folder_name
         Return : None
         > folder_name : The name of the folder to clear
         """
-        directory = self.get_root_folder()
-        folder_path = path.join(directory, self.get_save_folder())
-        if option_folder is not None:
-            folder_path = path.join(folder_path, option_folder)
-            relative_saves_path = f'{self.__SAVE_FOLDER}/{option_folder}'
-            lg.debug("Clearing folder %s.", relative_saves_path)
-        else:
-            lg.debug("Clearing folder %s.", self.get_save_folder())
-        if not os.path.exists(folder_path):
+        folder_path = build_path(self.get_save_path(), option_folder)
+        relative_path = build_path(self.get_save_folder(), option_folder)
+        lg.debug("Clearing folder %s.", relative_path)
+        if not path.exists(folder_path):
             lg.warning("The folder to clear doesn't exist.")
             return
         for file_name in listdir(folder_path):
-            file_path = join(folder_path, file_name)
+            file_path = path.join(folder_path, file_name)
             try:
-                if isfile(file_path):
+                if path.isfile(file_path):
                     os.remove(file_path)
             except OSError as error:
                 lg.critical("The file was not found. %s", error)
@@ -559,17 +450,16 @@ class Converter(Constants):
 
     def clear_all_save_folder(self):
         """
-        Brief : Delete all files and folder in the save folder
+        Brief : Delete everything in the save folder
         Return : None
         """
-        directory = self.get_root_folder()
-        folder_path = path.join(directory, self.get_save_folder())
+        folder_path = self.get_save_path()
         lg.debug("Clearing folder %s.", self.get_save_folder())
 
         for file_name in listdir(folder_path):
-            file_path = join(folder_path, file_name)
+            file_path = path.join(folder_path, file_name)
             try:
-                if isfile(file_path):
+                if path.isfile(file_path):
                     os.remove(file_path)
                 elif path.isdir(file_path):
                     shutil.rmtree(file_path)
@@ -746,16 +636,13 @@ class PulpConverter(Converter):
         > option_folder : The name of the sub folder to define problems from
         > name : The name of the problems
         """
-        if option_folder is None :
-            lg.debug("Define all from %s.", self.get_save_folder())
-        else :
-            relative_path = f'{self.get_save_folder()}/{option_folder}'
-            lg.debug("Define all from %s.", relative_path)
+        folder_path = build_path(self.get_save_path(), option_folder)
+        relative_path = build_path(self.get_save_folder(), option_folder)
+        lg.debug("Define all from %s.", relative_path)
         lg.disable(level=lg.DEBUG)
-        folder_path = self.get_save_path(option_folder)
         for file_name in listdir(folder_path) :
-            file_path = os.path.join(folder_path, file_name)
-            if os.path.isfile(file_path) :
+            file_path = path.join(folder_path, file_name)
+            if path.isfile(file_path) :
                 self.define_problem(file_name, name)
         lg.disable(level=lg.NOTSET)
         lg.debug("Folder definition done !")
@@ -792,17 +679,14 @@ class PulpConverter(Converter):
         > option_folder : The name of the sub folder to define problems from
         > solver_name : The name of the solver to use
         """
-        if option_folder is None :
-            lg.debug("Solving all from %s.", self.get_save_folder())
-        else :
-            relative_path = f'{self.get_save_folder()}/{option_folder}'
-            lg.debug("Solving all from %s.", relative_path)
+        folder_path = build_path(self.get_save_path(), option_folder)
+        relative_path = build_path(self.get_save_folder(), option_folder)
+        lg.debug("Solving all from %s.", relative_path)
         lg.disable(level=lg.DEBUG)
-        folder_path = self.get_save_path(option_folder)
         for file_name in listdir(folder_path) :
-            file_path = os.path.join(folder_path, file_name)
-            if os.path.isfile(file_path) :
-                self.solve(file_name, solver)
+            file_path = path.join(folder_path, file_name)
+            if path.isfile(file_path) :
+                self.solve(file_name, solver_name)
         lg.disable(level=lg.NOTSET)
         lg.debug("Folder solve done !")
 
@@ -815,7 +699,7 @@ class PulpConverter(Converter):
         # If the file has been solved
         folder = self.get_result_folder()
         lg.debug("Saving solutions in folder %s.", folder)
-        folder_path = path.join(self.get_root_folder(), folder)
+        folder_path = path.join(self.get_root_path(), folder)
         file_path = path.join(folder_path, self.get_result_file())
         # Create folder and/or file if missing, then save the solutions
         os.makedirs(folder_path, exist_ok=True)
@@ -828,63 +712,6 @@ class PulpConverter(Converter):
                     file.write(f' | Status : {solver_info.get_status()}')
                     file.write(f' | Execution time : {solver_info.time}\n')
         lg.debug("Solutions Saved !")
-
-
-def path_tail(path_name):
-    """
-    Brief : Get the name of the last element (tail) in path_name
-    Return : The tail of path_name
-    > path_name : The path from which to extract the tail
-    """
-    head, tail = path.split(path_name)
-    return tail or path.basename(head)
-
-
-def to_ilp_suffix(file):
-    """
-    Brief : Change the extension of the given file name by '.lpt'
-    Return : The modified file name
-    > file : The name of the file to change the extension
-    """
-    return Path(file).with_suffix('.lpt')
-
-
-def lines_from_file(file_path):
-    """
-    Brief : Open a file from the given path to get every lines
-    Return : Every lines in a list
-    > file_path : The path of the file to open
-    """
-    try:
-        with open(file_path, 'r') as file:
-            lines = file.readlines()
-            lg.debug("Read done !")
-            return lines
-    except FileNotFoundError as error:
-        lg.critical("The file was not found. %s", error)
-    return None
-
-
-def split(string, splitter_list):
-    """
-    Brief : Split the given string with a list of splitters
-    Return : The splitted string in a list of string list
-    > string : The string to split
-    > splitter_list : A list containing the strings used to split
-    """
-    txt_list = []
-    for i in range(len(splitter_list)-1) :
-        theme_list = []
-        pos1 = string.find(splitter_list[i]) + len(splitter_list[i])
-        pos2 = string.find(splitter_list[i + 1])
-        tmp_pos = pos1
-        while pos1 < pos2 :
-            if string[tmp_pos] == '\n' :
-                theme_list.append(string[pos1:tmp_pos])
-                pos1 = tmp_pos + 1
-            tmp_pos += 1
-        txt_list.append(theme_list)
-    return txt_list
 
 
 def main():

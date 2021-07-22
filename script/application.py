@@ -4,7 +4,7 @@
 """
 File : application.py
 Author : lgbarrere
-Brief : Create a windowed User Interface for the converter
+Brief : Create an API for the converter
 """
 import os
 from os import path
@@ -15,9 +15,9 @@ from enum import Enum, auto
 import numpy as np
 import matplotlib.pyplot as plt
 
-from sat_manager import SatManager
-import converter as conv
-from converter import PulpConverter
+from manager.utility import Constants, path_tail
+from manager.sat import SatManager
+from manager.converter import PulpConverter
 
 
 class ColorTheme(Enum):
@@ -40,14 +40,15 @@ class ProblemData:
     """
     Brief : Define the data used by the application
     """
-    pass
 
 
-class Histogram:
+class Histogram(Constants):
     """
     Brief : Create a histogram of the execution time for each solver
     """
-    def __init__(self, sat_manager, converter, sat_file_list, ilp_file_list, sat_solver_list, ilp_solver_list):
+    def __init__(self, sat_manager, converter, sat_file_list, ilp_file_list,
+                 sat_solver_list, ilp_solver_list):
+        super().__init__()
         self.title = 'Solver execution time'
         self.x_label = 'Solver and ILP'
         self.y_label = 'Execution time'
@@ -77,7 +78,7 @@ class Histogram:
             solver_time_dict[solver] = []
 
         for file in self.sat_file_list :
-            file = conv.path_tail(file)
+            file = path_tail(file)
             problem_name = path.splitext(file)[0]
             if problem_name not in label_list :
                 label_list.append(problem_name)
@@ -88,7 +89,7 @@ class Histogram:
                 label_time_dict[problem_name][solver] = info.get_time()
 
         for file in self.ilp_file_list :
-            file = conv.path_tail(file)
+            file = path_tail(file)
             problem_name = path.splitext(file)[0]
             if problem_name not in label_list :
                 label_list.append(problem_name)
@@ -98,12 +99,9 @@ class Histogram:
                 solver_time_dict[solver].append(round(info.get_time(), 2))
                 label_time_dict[problem_name][solver] = info.get_time()
 
-        label_len = len(label_list)
         label_time_len = len(label_time_dict)
         nb_sat_solvers = len(self.sat_solver_list)
         nb_ilp_solvers = len(self.ilp_solver_list)
-        nb_sat_files = len(self.sat_file_list)
-        nb_ilp_files = len(self.ilp_file_list)
         x_list = np.arange(label_time_len) # Label locations
         width = 0.8/(nb_sat_solvers + nb_ilp_solvers)
 
@@ -115,7 +113,7 @@ class Histogram:
         i_list = {}
         for solver in solver_time_dict :
             i_list[solver] = []
-        
+
         prob_num = 0
         for problem_name in label_time_dict :
             tmp = 0
@@ -147,13 +145,14 @@ class Histogram:
         plt.show()
 
 
-class Application():
+class Application(Constants):
     """
     Brief : Create the UI that uses the converter
     """
     __FONT_THEME = 'Arial'
 
     def __init__(self):
+        super().__init__()
         # SAT manager
         self.sat_manager = SatManager()
         # Converter
@@ -622,18 +621,18 @@ class Application():
             )
 
         # choose files
-        path_to_folder = self.converter.get_data_path()
+        path_to_folder = self.get_data_path()
         file_tuple = fd.askopenfilenames(
             parent=self.widget_ref['window'], title='Choose files',
             initialdir=path_to_folder, filetypes=filetypes
             )
         if file_tuple :
             self.sat_file_tuple = file_tuple
-            self.sat_folder = conv.path_tail(path.dirname(file_tuple[0]))
-            if self.sat_folder == self.converter.get_data_folder() :
+            self.sat_folder = path_tail(path.dirname(file_tuple[0]))
+            if self.sat_folder == self.get_data_folder() :
                 self.sat_folder = None
             for file_name in file_tuple :
-                file_name = conv.path_tail(file_name)
+                file_name = path_tail(file_name)
                 self.sat_manager.load_file(file_name, self.sat_folder)
             self.nb_dimacs = len(self.sat_file_tuple)
             self.update_selected_files()
@@ -654,11 +653,11 @@ class Application():
             )
         # Reset the file list because a folder is asked
         self.sat_file_tuple = ()
-        if folder == '' or conv.path_tail(folder) == self.converter.get_data_folder() :
+        if folder == '' or path_tail(folder) == self.get_data_folder() :
             self.sat_folder = None
             self.nb_dimacs = len(files_from_folder(path_to_folder))
         else :
-            self.sat_folder = conv.path_tail(folder)
+            self.sat_folder = path_tail(folder)
             self.nb_dimacs = len(files_from_folder(folder))
         self.sat_manager.load_folder(self.sat_folder)
         self.update_selected_files()
@@ -684,12 +683,12 @@ class Application():
             )
         if file_tuple :
             self.ilp_file_tuple = file_tuple
-            self.ilp_folder = conv.path_tail(path.dirname(file_tuple[0]))
-            if self.ilp_folder == self.converter.get_save_folder() :
+            self.ilp_folder = path_tail(path.dirname(file_tuple[0]))
+            if self.ilp_folder == self.get_save_folder() :
                 self.ilp_folder = None
             for file_name in file_tuple :
                 self.converter.ilp_from_file(
-                    conv.path_tail(file_name), option_folder=self.ilp_folder
+                    path_tail(file_name), option_folder=self.ilp_folder
                     )
             self.nb_ilp = len(self.ilp_file_tuple)
             self.update_selected_files()
@@ -703,18 +702,18 @@ class Application():
         Return : None
         """
         # choose a directory
-        path_to_folder = self.converter.get_save_path()
+        path_to_folder = self.get_save_path()
         folder = fd.askdirectory(
             parent=self.widget_ref['window'], title='Choose a folder',
             initialdir=path_to_folder
             )
         # Reset the file list because a folder is asked
         self.ilp_file_tuple = ()
-        if folder == '' or conv.path_tail(folder) == self.converter.get_save_folder() :
+        if folder == '' or path_tail(folder) == self.get_save_folder() :
             self.ilp_folder = None
             self.nb_ilp = len(files_from_folder(path_to_folder))
         else :
-            self.ilp_folder = conv.path_tail(folder)
+            self.ilp_folder = path_tail(folder)
             self.nb_ilp = len(files_from_folder(folder))
         self.converter.ilp_from_folder(self.ilp_folder)
         self.update_selected_files()
@@ -736,7 +735,7 @@ class Application():
             self.converter.save_all_in_folder(self.ilp_folder)
         else :
             for file in self.sat_file_tuple :
-                file = conv.path_tail(file)
+                file = path_tail(file)
                 self.converter.convert_from_file(file, self.sat_folder)
                 self.converter.save_ilp_in_file(file, self.ilp_folder)
         # Update selected files
@@ -756,7 +755,7 @@ class Application():
         if self.nb_ilp > 0 :
             if self.ilp_file_tuple :
                 for file in self.ilp_file_tuple :
-                    file_name = conv.path_tail(file)
+                    file_name = path_tail(file)
                     self.converter.define_problem(file_name)
             else :
                 self.converter.define_problem_from_folder(self.ilp_folder)
@@ -775,7 +774,7 @@ class Application():
                 if self.nb_dimacs > 0 :
                     if self.sat_file_tuple :
                         for file in self.sat_file_tuple :
-                            file = conv.path_tail(file)
+                            file = path_tail(file)
                             self.sat_manager.solve(
                                 file_name=file, solver_name=solver
                                 )
@@ -806,7 +805,7 @@ class Application():
                 if self.nb_ilp > 0 :
                     if self.ilp_file_tuple :
                         for file in self.ilp_file_tuple :
-                            file = conv.path_tail(file)
+                            file = path_tail(file)
                             self.converter.solve(file, solver)
                             self.widget_ref['label_output'].config(
                                 text='Finished solving'
@@ -835,8 +834,8 @@ class Application():
                     sat_file_list = self.sat_file_tuple
                 else :
                     directory = path.dirname(path.dirname(__file__))
-                    save_folder = self.converter.get_save_folder()
-                    path_to_folder = path.join(directory, save_folder)
+                    data_folder = self.get_data_path()
+                    path_to_folder = path.join(directory, data_folder)
                     if self.sat_folder is not None :
                         path_to_folder = path.join(path_to_folder, self.sat_folder)
                     for file_name in files_from_folder(path_to_folder) :
@@ -846,7 +845,7 @@ class Application():
                     ilp_file_list = self.ilp_file_tuple
                 else :
                     directory = path.dirname(path.dirname(__file__))
-                    save_folder = self.converter.get_save_folder()
+                    save_folder = self.get_save_path()
                     path_to_folder = path.join(directory, save_folder)
                     if self.ilp_folder is not None :
                         path_to_folder = path.join(path_to_folder, self.ilp_folder)

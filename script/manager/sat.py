@@ -4,15 +4,14 @@
 """
 File : sat_manager.py
 Author : lgbarrere
-Brief : To read and solve DIMACS files with PySAT
+Brief : Read and solve DIMACS files with PySAT
 """
-from os import path
-from os import listdir
+from os import path, listdir
 
 from pysat.formula import CNF
 from pysat.solvers import Solver
 
-from converter import Constants
+from .utility import Constants, build_path
 
 
 class Solverinformation:
@@ -70,21 +69,16 @@ class SatProblem :
         return self.solver_dict[solver_name]
 
 
-class SatManager:
+class SatManager(Constants):
     """
     Brief : Allows PySAT solvers to solve CNF-SAT formulas
     """
-    __CONST = Constants()
-    __FOLDER_PATH = path.join(
-        __CONST.get_root_folder(), __CONST.get_data_folder()
-        )
-
-
     def __init__(self):
         # List of every available solvers
         # Note : MapleCM, Minicard, Minisat22 and Minisat-gh not used here
         # because they seem to have a bug that occurs sometimes
         # if used after another use of a solver
+        super().__init__()
         self.__avail_solver_list = [
             'Cadical', 'Gluecard3', 'Gluecard4', 'Glucose3',
             'Glucose4', 'Lingeling', 'Maplechrono', 'Mergesat3'
@@ -94,14 +88,6 @@ class SatManager:
 
 
     ## Getters
-    def get_folder(self) :
-        """
-        Brief : Get the path to the data folder
-        Return : The path
-        """
-        return self.__FOLDER_PATH
-
-
     def get_problem(self, file_name):
         """
         Brief : Get the problem with the given file name
@@ -137,11 +123,7 @@ class SatManager:
         > file_name : The file to load
         > folder : Optional sub folder from which to load the file
         """
-        folder_path = self.get_folder()
-        if folder is not None :
-            folder_path = path.join(folder_path, folder)
-        
-        file_path = path.join(folder_path, file_name)
+        file_path = build_path(self.get_data_path(), folder, file_name)
         if path.isfile(file_path) :
             self.problem_dict[file_name] = SatProblem(
                 cnf=CNF(from_file=file_path)
@@ -154,9 +136,7 @@ class SatManager:
         Return : None
         > folder : Optional sub folder from which to load the files
         """
-        folder_path = self.get_folder()
-        if folder is not None :
-            folder_path = path.join(folder_path, folder)
+        folder_path = build_path(self.get_data_path(), folder)
         for file_name in listdir(folder_path) :
             self.load_file(file_name, folder)
 
@@ -197,9 +177,10 @@ class SatManager:
         > folder : The name of the folder from which to solve all SAT files
         > solver_name : The name of the solve to use
         """
-        for file_name in listdir(__FOLDER_PATH) :
-            file_path = os.path.join(__FOLDER_PATH, file_name)
-            if os.path.isfile(file_path) :
+        folder_path = build_path(self.get_data_path(), folder)
+        for file_name in listdir(folder_path) :
+            file_path = path.join(folder_path, file_name)
+            if path.isfile(file_path) :
                 self.solve(file_name=file_name, solver_name=solver_name)
 
 
