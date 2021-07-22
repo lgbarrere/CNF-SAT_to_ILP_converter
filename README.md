@@ -16,7 +16,7 @@ Once in the root folder, use the command :
 * `python converter/application.py` if you are on Windows
 * `python3 converter/application.py` if you are on Linux or Mac
 
-## Use
+## Usage
 The converter window should be opened.
 
 Before starting, it is strongly recommanded to move your DIMACS files (or a folder containing your files) in the **data/** folder of this projet.
@@ -42,3 +42,6 @@ By clicking the "**Start solving**" button, you will make the program try to sol
 The right component of the interface will show details on what happens (If a file is selected, if each ILP is being solved, what is the solver status, ...).
 
 Once the program finished solving, a summary will be saved in the **result/result.sol** (text file).
+
+## Testing
+Use `python setup.py pytest` to launch all the tests.
