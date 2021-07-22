@@ -167,7 +167,7 @@ class SatManager:
         Return : None
         > file_name : The loaded file
         > cnf = The CNF to solve
-        > solver_name : The solver to use
+        > solver_name : The name of the solver to use
         """
         if file_name is None :
             if cnf is not None :
@@ -194,6 +194,8 @@ class SatManager:
         """
         Brief : Start solving an entire folder and set the time to proceed
         Return : None
+        > folder : The name of the folder from which to solve all SAT files
+        > solver_name : The name of the solve to use
         """
         for file_name in listdir(__FOLDER_PATH) :
             file_path = os.path.join(__FOLDER_PATH, file_name)

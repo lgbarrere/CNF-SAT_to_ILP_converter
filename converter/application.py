@@ -873,6 +873,7 @@ def files_from_folder(path_to_folder):
     """
     Brief : Get all files from a folder path
     Return : The files in a list
+    > path_to_folder : The path to the folder to get all files
     """
     return [file for file in os.listdir(path_to_folder) \
             if os.path.isfile(os.path.join(path_to_folder, file))]

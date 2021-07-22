@@ -635,6 +635,7 @@ class PulpProblem:
         """
         Brief : Getter for the solver information (from its name)
         Return : The solver information
+        > solver_name : The name of the solver to get the information
         """
         return self.solver_dict[solver_name]
 
@@ -663,13 +664,14 @@ class PulpConverter(Converter):
         """
         Brief : Get the ILP problem from a file name
         Return : The ILP problem
+        > file_name : The name of the file to get the ILP problem
         """
         return self.__problem_dict[to_ilp_suffix(file_name)]
 
 
     def get_solvers(self):
         """
-        Brief : Get the available solvers
+        Brief : Get the list of the available solvers
         Return : The solver list
         """
         return self.__solver_list
@@ -680,6 +682,8 @@ class PulpConverter(Converter):
         """
         Brief : Define the problem from a loaded ILP given by a file name
         Return : True if the problem is defined, False otherwise
+        > file_name : The name of the ILP file
+        > name : An optional name for the problem
         """
         file_name = to_ilp_suffix(file_name)
         if not self.is_converted(file_name) :
@@ -729,16 +733,18 @@ class PulpConverter(Converter):
 
         for solver_name in self.__solver_list :
             pulp_problem.solver_dict[solver_name] = SolverInformation(
-                    pulp.getSolver(solver_name), pulp.LpStatusNotSolved
+                pulp.getSolver(solver_name), pulp.LpStatusNotSolved
                 )
         return True
 
 
-    def define_problem_from_folder(self, option_folder, name='NoName'):
+    def define_problem_from_folder(self, option_folder=None, name='NoName'):
         """
         Brief : Define problems from a folder converted into ILP,
-        define the problem on all converted problems
+        if the given folder is None, problems are defined from the saves folder
         Return : None
+        > option_folder : The name of the sub folder to define problems from
+        > name : The name of the problems
         """
         if option_folder is None :
             lg.debug("Define all from %s.", self.get_save_folder())
@@ -757,8 +763,10 @@ class PulpConverter(Converter):
 
     def solve(self, file_name, solver_name='PULP_CBC_CMD'):
         """
-        Brief : Start solving and set the time to proceed
+        Brief : Solve a problem from its file name, updating its information
         Return : None
+        > file_name : The name of the file used to define a problem to solve
+        > solver_name : The name of the solver to use
         """
         file_name = to_ilp_suffix(file_name)
         pulp_problem = self.__problem_dict[file_name]
@@ -777,10 +785,12 @@ class PulpConverter(Converter):
 
 
 
-    def solve_folder(self, option_folder, solver=None):
+    def solve_folder(self, option_folder=None, solver_name='PULP_CBC_CMD'):
         """
         Brief : Start solving an entire folder and set the time to proceed
         Return : None
+        > option_folder : The name of the sub folder to define problems from
+        > solver_name : The name of the solver to use
         """
         if option_folder is None :
             lg.debug("Solving all from %s.", self.get_save_folder())
@@ -824,6 +834,7 @@ def path_tail(path_name):
     """
     Brief : Get the name of the last element (tail) in path_name
     Return : The tail of path_name
+    > path_name : The path from which to extract the tail
     """
     head, tail = path.split(path_name)
     return tail or path.basename(head)
@@ -833,6 +844,7 @@ def to_ilp_suffix(file):
     """
     Brief : Change the extension of the given file name by '.lpt'
     Return : The modified file name
+    > file : The name of the file to change the extension
     """
     return Path(file).with_suffix('.lpt')
 
