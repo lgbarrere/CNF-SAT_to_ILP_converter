@@ -23,3 +23,7 @@ def test_sat():
         for solver_name in sat_manager.get_solvers() :
             sat_manager.solve(file_name=file_name, solver_name=solver_name)
     print(sat_manager)
+    # Test limit time
+    limit_file = 'BA2_270_73_code_6_16.txt'
+    sat_manager.load_file(limit_file, 'dimacs')
+    sat_manager.solve(file_name=limit_file, time_limit=3)

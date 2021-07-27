@@ -648,12 +648,13 @@ class PulpConverter(Converter):
         lg.debug("Folder definition done !")
 
 
-    def solve(self, file_name, solver_name='PULP_CBC_CMD'):
+    def solve(self, file_name, solver_name='PULP_CBC_CMD', time_limit=None):
         """
         Brief : Solve a problem from its file name, updating its information
         Return : None
         > file_name : The name of the file used to define a problem to solve
         > solver_name : The name of the solver to use
+        > time_limit : The maximum time taken to solve before interruption
         """
         file_name = to_ilp_suffix(file_name)
         pulp_problem = self.__problem_dict[file_name]
@@ -662,7 +663,9 @@ class PulpConverter(Converter):
             start_time = time.time()
             # If the solver is interrupted, consider the problem is unsolved
             try :
-                solver_info.status = pulp_problem.problem.solve(solver_info.solver)
+                solver_info.status = pulp_problem.problem.solve(
+                    pulp.getSolver(solver_name, timeLimit=time_limit)
+                    )
             except pulp.apis.core.PulpSolverError :
                 lg.warning("Interrupted solver.")
                 solver_info.status = pulp.LpStatusNotSolved
@@ -672,12 +675,15 @@ class PulpConverter(Converter):
 
 
 
-    def solve_folder(self, option_folder=None, solver_name='PULP_CBC_CMD'):
+    def solve_folder(
+        self, option_folder=None, solver_name='PULP_CBC_CMD', time_limit=None
+        ):
         """
         Brief : Start solving an entire folder and set the time to proceed
         Return : None
         > option_folder : The name of the sub folder to define problems from
         > solver_name : The name of the solver to use
+        > time_limit : The maximum time taken to solve before interruption
         """
         folder_path = build_path(self.get_save_path(), option_folder)
         relative_path = build_path(self.get_save_folder(), option_folder)
@@ -686,7 +692,7 @@ class PulpConverter(Converter):
         for file_name in listdir(folder_path) :
             file_path = path.join(folder_path, file_name)
             if path.isfile(file_path) :
-                self.solve(file_name, solver_name)
+                self.solve(file_name, solver_name, time_limit)
         lg.disable(level=lg.NOTSET)
         lg.debug("Folder solve done !")
 

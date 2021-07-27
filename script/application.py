@@ -177,8 +177,8 @@ class Application(Constants):
         self.widget_ref['window'] = window
         #self.window.iconbitmap('logo.ico')
         window.title('SAT-ILP converter')
-        window.geometry('1200x700')
-        window.minsize(1200, 700)
+        window.geometry('1000x600')
+        window.minsize(1000, 600)
         window.config(bg=self.bg_color)
         # Configurations
         self.radiobutton_var = tk.IntVar()
@@ -203,6 +203,7 @@ class Application(Constants):
         self.header_component()
         self.main_component()
         self.solver_component()
+        self.control_panel()
         self.dimacs_component()
         self.separator()
         self.ilp_component()
@@ -288,19 +289,57 @@ class Application(Constants):
             highlightcolor=self.fg_color, highlightthickness=5
             )
         self.widget_ref['solver_frame'] = solver_frame
+        # Display
+        solver_frame.pack(side='left', fill='y', padx=20, ipadx=20)
 
+
+    def control_panel(self):
+        """
+        Brief : Create a panel to control solving options
+        Return : None
+        """
+        # Container
+        control_frame = tk.Frame(
+            self.widget_ref['solver_frame'], relief='solid',
+            bg=self.bg_color
+            )
+        self.widget_ref['control_frame'] = control_frame
+        # Time limit
+        self.time_checkbox_var = tk.IntVar()
+        check_time = tk.Checkbutton(
+            control_frame, font=(self.__FONT_THEME, 14),
+            text='Time limit', bg=self.bg_color,
+            fg=self.fg_color, bd=0,
+            selectcolor=self.bg_color,
+            activebackground=self.bg_color,
+            activeforeground=self.fg_color,
+            variable=self.time_checkbox_var, onvalue=1, offvalue=0,
+            )
+        self.widget_ref['check_time'] = check_time
+        self.spinbox_time = tk.Spinbox(
+            control_frame, font=(self.__FONT_THEME, 14), justify='right',
+            exportselection=0, from_=1, to=3600, increment=1, width=4
+            )
+        self.widget_ref['spinbox_time'] = self.spinbox_time
+        label_time_unit = tk.Label(
+            control_frame, text='ms',
+            font=(self.__FONT_THEME, 14), bg=self.bg_color,
+            fg=self.fg_color
+            )
+        self.widget_ref['label_time_unit'] = label_time_unit
         # Start solving button
         solve_button = tk.Button(
-            self.widget_ref['solver_frame'], text='Start solving',
+            control_frame, text='Start solving',
             font=(self.__FONT_THEME, 16),
             bg='grey', fg=self.invert_fg_color, command=self.solve_selection
             )
         self.widget_ref['solve_button'] = solve_button
-
         # Display
-        solver_frame.pack(side='left', fill='y', padx=20, ipadx=20)
-        # Solve button
-        solve_button.pack(side='bottom', pady=20)
+        control_frame.pack(side='bottom', fill='x', pady=40)
+        check_time.pack(side='left', padx=10)
+        self.spinbox_time.pack(side='left')
+        label_time_unit.pack(side='left', padx=(2, 0))
+        solve_button.pack(side='left', expand=True, padx=20)
 
 
     def dimacs_component(self):
@@ -376,10 +415,10 @@ class Application(Constants):
         """
         separator = tk.Frame(
             self.widget_ref['solver_frame'], relief='solid',
-            bg=self.invert_bg_color, width=5, height=400
+            bg=self.invert_bg_color, width=5
             )
         self.widget_ref['separator'] = separator
-        separator.pack(side='left', expand=True)
+        separator.pack(side='left', expand=True, fill='y', pady=20)
 
 
     def ilp_component(self):
@@ -464,7 +503,7 @@ class Application(Constants):
             )
         self.widget_ref['label_output'] = label_output
         label_satus = tk.Label(
-            result_frame, text='Status :',
+            result_frame, text='Status :\nNone',
             font=(self.__FONT_THEME, 16), bg=self.bg_color,
             fg=self.fg_color
             )
@@ -637,7 +676,7 @@ class Application(Constants):
             self.nb_dimacs = len(self.sat_file_tuple)
             self.update_selected_files()
             self.widget_ref['label_output'].config(text='Files selected')
-            self.widget_ref['label_satus'].config(text='Status :')
+            self.widget_ref['label_satus'].config(text='Status :\nNone')
 
 
     def get_dimacs_folder(self):
@@ -662,7 +701,7 @@ class Application(Constants):
         self.sat_manager.load_folder(self.sat_folder)
         self.update_selected_files()
         self.widget_ref['label_output'].config(text='Files selected')
-        self.widget_ref['label_satus'].config(text='Status :')
+        self.widget_ref['label_satus'].config(text='Status :\nNone')
 
 
     def get_ilp_files(self):
@@ -693,7 +732,7 @@ class Application(Constants):
             self.nb_ilp = len(self.ilp_file_tuple)
             self.update_selected_files()
             self.widget_ref['label_output'].config(text='Files selected')
-            self.widget_ref['label_satus'].config(text='Status :')
+            self.widget_ref['label_satus'].config(text='Status :\nNone')
 
 
     def get_ilp_folder(self):
@@ -718,7 +757,7 @@ class Application(Constants):
         self.converter.ilp_from_folder(self.ilp_folder)
         self.update_selected_files()
         self.widget_ref['label_output'].config(text='Files selected')
-        self.widget_ref['label_satus'].config(text='Status :')
+        self.widget_ref['label_satus'].config(text='Status :\nNone')
 
 
     def convert_files(self):
@@ -760,12 +799,15 @@ class Application(Constants):
             else :
                 self.converter.define_problem_from_folder(self.ilp_folder)
         self.widget_ref['label_output'].config(text='Solving')
-        self.widget_ref['label_satus'].config(text='Status :')
+        self.widget_ref['label_satus'].config(text='Status :\nNone')
         self.widget_ref['window'].update()
+        # Check time limit
+        time_limit = None
+        if self.time_checkbox_var.get() == 1 :
+            time_limit = self.spinbox_time.get()
         solve_try = False
         sat_solver_list = []
         ilp_solver_list = []
-
         # Solve CNF-SAT
         i = 0
         for solver in self.sat_manager.get_solvers() :
@@ -776,23 +818,25 @@ class Application(Constants):
                         for file in self.sat_file_tuple :
                             file = path_tail(file)
                             self.sat_manager.solve(
-                                file_name=file, solver_name=solver
+                                file_name=file, solver_name=solver,
+                                time_limit=time_limit
                                 )
                             self.widget_ref['label_output'].config(
                                 text='Finished solving'
                                 )
                             problem = self.sat_manager.get_problem(file)
                             solution = problem.get_solver_info(solver).get_solution()
-                            text = 'Status : ' + str(solution)
+                            text = 'Status :\n' + str(solution)
                             self.widget_ref['label_satus'].config(text=text)
                     else :
                         self.sat_manager.solve_folder(
-                            folder=self.sat_folder, solver_name=solver
+                            folder=self.sat_folder, solver_name=solver,
+                            time_limit=time_limit
                             )
                         self.widget_ref['label_output'].config(
                             text='Finished solving'
                             )
-                        text = 'Status : Solved all'
+                        text = 'Status :\nSolved all'
                         self.widget_ref['label_satus'].config(text=text)
                 solve_try = True
             i += 1
@@ -806,22 +850,24 @@ class Application(Constants):
                     if self.ilp_file_tuple :
                         for file in self.ilp_file_tuple :
                             file = path_tail(file)
-                            self.converter.solve(file, solver)
+                            self.converter.solve(
+                                file, solver, time_limit=time_limit
+                                )
                             self.widget_ref['label_output'].config(
                                 text='Finished solving'
                                 )
                             problem = self.converter.get_problem(file)
                             status = problem.get_solver_info(solver).get_status()
-                            text = 'Status : ' + status
+                            text = 'Status :\n' + status
                             self.widget_ref['label_satus'].config(text=text)
                     else :
                         self.converter.solve_folder(
-                            self.ilp_folder, solver
+                            self.ilp_folder, solver, time_limit=time_limit
                             )
                         self.widget_ref['label_output'].config(
                             text='Finished solving'
                             )
-                        text = 'Status : Solved all'
+                        text = 'Status :\nSolved all'
                         self.widget_ref['label_satus'].config(text=text)
                     solve_try = True
             i += 1
@@ -864,7 +910,7 @@ class Application(Constants):
             self.widget_ref['label_output'].config(
                 text='No solver was selected'
                 )
-            text = 'Status : None'
+            text = 'Status :\nNone'
             self.widget_ref['label_satus'].config(text=text)
 
 

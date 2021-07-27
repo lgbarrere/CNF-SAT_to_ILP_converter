@@ -7,6 +7,7 @@ Author : lgbarrere
 Brief : Read and solve DIMACS files with PySAT
 """
 from os import path, listdir
+import threading
 
 from pysat.formula import CNF
 from pysat.solvers import Solver
@@ -141,14 +142,27 @@ class SatManager(Constants):
             self.load_file(file_name, folder)
 
 
-    def solve(self, file_name=None, cnf=None, solver_name='Cadical'):
+    def __limit_solve(self):
+        print('Time over, solving interrupted !')
+
+
+    def solve(
+        self, file_name=None, cnf=None, solver_name='Cadical',
+        time_limit=None
+        ):
         """
         Brief : Solve a CNF with the given solver
         Return : None
         > file_name : The loaded file
         > cnf = The CNF to solve
         > solver_name : The name of the solver to use
+        > time_limit : The maximum time taken to solve before interruption
         """
+        # Threading at time_limit
+        if time_limit is not None :
+            thread_timer = threading.Timer(time_limit, self.__limit_solve)
+            thread_timer.start()
+        # Solve part
         if file_name is None :
             if cnf is not None :
                 with Solver(
@@ -170,12 +184,13 @@ class SatManager(Constants):
                 info.time = solver.time()
 
 
-    def solve_folder(self, folder, solver_name='Cadical'):
+    def solve_folder(self, folder, solver_name='Cadical', time_limit=None):
         """
         Brief : Start solving an entire folder and set the time to proceed
         Return : None
         > folder : The name of the folder from which to solve all SAT files
         > solver_name : The name of the solve to use
+        > time_limit : The maximum time taken to solve before interruption
         """
         folder_path = build_path(self.get_data_path(), folder)
         for file_name in listdir(folder_path) :
