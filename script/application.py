@@ -309,7 +309,7 @@ class Application(Constants):
         check_time = tk.Checkbutton(
             control_frame, font=(self.__FONT_THEME, 14),
             text='Time limit', bg=self.bg_color,
-            fg=self.fg_color, bd=0,
+            fg=self.fg_color, bd=0, highlightthickness=0,
             selectcolor=self.bg_color,
             activebackground=self.bg_color,
             activeforeground=self.fg_color,
@@ -389,7 +389,7 @@ class Application(Constants):
             button = tk.Checkbutton(
                 sat_frame, font=(self.__FONT_THEME, 14),
                 text=solver, bg=self.bg_color,
-                fg=self.fg_color, bd=0,
+                fg=self.fg_color, bd=0, highlightthickness=0,
                 selectcolor=self.bg_color,
                 activebackground=self.bg_color,
                 activeforeground=self.fg_color,
@@ -455,7 +455,7 @@ class Application(Constants):
             button = tk.Checkbutton(
                 ilp_frame, font=(self.__FONT_THEME, 14),
                 text=solver, bg=self.bg_color,
-                fg=self.fg_color, bd=0,
+                fg=self.fg_color, bd=0, highlightthickness=0,
                 selectcolor=self.bg_color,
                 activebackground=self.bg_color,
                 activeforeground=self.fg_color,
@@ -617,7 +617,22 @@ class Application(Constants):
                 activebackground=self.bg_color,
                 activeforeground=self.fg_color
                 )
-        # Right component
+        # Control panel
+        self.widget_ref['control_frame'].config(
+            bg=self.bg_color
+            )
+        self.widget_ref['check_time'].config(
+            bg=self.bg_color,
+            fg=self.fg_color,
+            selectcolor=self.bg_color,
+            activebackground=self.bg_color,
+            activeforeground=self.fg_color
+            )
+        self.widget_ref['label_time_unit'].config(
+            bg=self.bg_color,
+            fg=self.fg_color
+            )
+        # Result component
         self.widget_ref['result_frame'].config(
             bg=self.bg_color,
             highlightbackground=self.fg_color,
