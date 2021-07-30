@@ -4,44 +4,62 @@ Python software project that converts a given CNF-SAT formula f into ILP constra
 This work is in progress, please wait for the future updates.
 
 ## Setup
-Open a terminal and clone this projet with `git clone [URL]`.
+Open a terminal and clone this projet with `git clone [URL]` or extract it from its archive.
 
-Go to the root folder of this projet by using `cd [PathToFolder]`.
+Go to the root folder of this projet by using `cd [PathToFolder]` in the terminal.
 
 Simply use `pip install -r requirements.txt` to get all required dependances.
 
 ## Launch
+Like in the **Setup** section, it is strongly recommanded to be in the root folder of this projet by using `cd [PathToFolder]` in the terminal before starting.
+
 Once in the root folder, use the command :
 
-* `python converter/application.py` if you are on Windows
-* `python3 converter/application.py` if you are on Linux or Mac
+* `python script/application.py` if you are on Windows
+* `python3 script/application.py` if you are on Linux or Mac
 
 ## Usage
-The converter window should be opened.
+The API should now be opened.
 
-Before starting, it is strongly recommanded to move your DIMACS files (or a folder containing your files) in the **data/** folder of this projet.
+Before starting, it is necessary to move your DIMACS files (or a folder containing your files) in the **data/** folder of this projet and your ILP files (or a folder again) in the **saves/** folder if you have some. You can do it while in use but this is not recommanded, particularly if the API started solving loaded files.
 
 * **Conversion**
 
-You can open some DIMACS files (.txt or .cnf) or a folder containing DIMACS files with the menu bar at the top.
+You can open some DIMACS or ILP files (recommanded .txt or .cnf for DIMACS and .lpt for ILP files, but works with any selected file) or a folder containing DIMACS or ILP files with the menu bar at the top.
 
-Once the dimacs files are selected, the interface should show how many DIMACS files are selected.
+A loaded file is assumed to be well formmated for now, but this could change in a future update.
 
-You can convert all of them into ILP by clicking on the "**Convert**" button, this will save each ILP in a dedicated file in the **saves/** folder.
+Once the files are selected, the interface should show how many files are loaded.
+
+You can convert all of the DIMACS files into ILP by clicking on the "**Convert**" button, this will save each ILP in a dedicated file in the **saves/** folder if not already done (this action will load the ILP by overwriting the previous ILP loads).
+
+Every new loads overwrite the previous ones.
 
 * **Solver selection**
 
-All converted files will be loaded as ILP files, the user interface shows how many ILP files are selected as well.
-
-You can choose which solver the program must use to solve all selected ILP by selecting or deselecting check-boxes in the left component.
+You can choose which solver the program must use to solve all loaded DIMACS and ILP files by (de)selecting check-boxes in the left component.
 
 * **Solving and displays**
 
-By clicking the "**Start solving**" button, you will make the program try to solve each ILP with each selected solvers.
+By clicking the "**Start solving**" button, you will make the program try to solve each loaded DIMACS and ILP with each respective selected solvers.
 
 The right component of the interface will show details on what happens (If a file is selected, if each ILP is being solved, what is the solver status, ...).
 
 Once the program finished solving, a summary will be saved in the **result/result.sol** (text file).
 
+You can display the histogram of the execution time of each solver on each DIMACS and ILP file it ran on by clicking the "H" button. If both DIMACS and ILP have the same name (by excluding their extension) the problem is considered the same and will be merged in the histogram.
+
 ## Testing
-Use `python setup.py pytest` to launch all the tests.
+To launch all the tests, if you are in the root folder of this projet (see the **Launch** section), use the command :
+
+* `python script/setup.py pytest` if you are on Window
+* `python3 script/setup.py pytest` if you are on Linux or Mac
+
+All the tests should pass correctly, otherwise feel free to check out were this could come from or try to use the API anyway. It should work even if some tests doesn't pass, but you still can report any issue directly in this project.
+
+## Miscellaneous
+You can switch color themes with the dedicated **Theme** menu if you prefer the light mode to the dark one.
+
+The **Time limit** option can been seen but doesn't work for now (also not used by the solvers for this reason).
+
+The "S" button does nothing for now and is going to be removed if no additional display may be allowed.
