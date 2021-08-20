@@ -25,7 +25,7 @@ Before starting, it is necessary to move your DIMACS files (or a folder containi
 
 * **Conversion**
 
-You can open some DIMACS or ILP files (recommanded .txt or .cnf for DIMACS and .lpt for ILP files, but works with any selected file) or a folder containing DIMACS or ILP files with the menu bar at the top.
+You can open some DIMACS or ILP files (recommanded .txt or .cnf for DIMACS and .lpt for ILP files, but works with any selected file) or a folder containing DIMACS or ILP files with the "File" menu bar at the top.
 
 A loaded file is assumed to be well formmated for now, but this could change in a future update.
 
@@ -35,9 +35,19 @@ You can convert all of the DIMACS files into ILP by clicking on the "**Convert**
 
 Every new loads overwrite the previous ones.
 
+* **Adding solvers**
+
+In the "File" menu bar, the "Locate ILP solver" option allows to choose a PuLP solver from its database and configure it from its given path, you must know where is the executable of the solver in your computer to use this option.
+
 * **Solver selection**
 
 You can choose which solver the program must use to solve all loaded DIMACS and ILP files by (de)selecting check-boxes in the left component.
+
+* **Use of timers**
+
+All the selected solvers can be interrupted while in use if a time limit is given. For this purpose you can select the "Time limit" checkbox and change the number of seconds before the current solver in use is interrupted.
+
+If a solver reaches its time limit, "Timeout" will be displayed as a status in the Display result section. 
 
 * **Solving and displays**
 
@@ -59,7 +69,3 @@ All the tests should pass correctly, otherwise feel free to check out were this 
 
 ## Miscellaneous
 You can switch color themes with the dedicated **Theme** menu if you prefer the light mode to the dark one.
-
-The **Time limit** option can been seen but doesn't work for now (also not used by the solvers for this reason).
-
-The "S" button does nothing for now and is going to be removed if no additional display may be allowed.
