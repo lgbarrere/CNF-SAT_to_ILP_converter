@@ -6,8 +6,11 @@ File : sat_manager.py
 Author : lgbarrere
 Brief : Read and solve DIMACS files with PySAT
 """
+
+import sys
+import ast
 from os import path, listdir
-import threading
+import subprocess as subp
 
 from pysat.formula import CNF
 from pysat.solvers import Solver
@@ -61,7 +64,7 @@ class SatProblem :
 
 
     # Getters
-    def get_solver_info(self, solver_name):
+    def get_solver_info(self, solver_name='Cadical'):
         """
         Brief : Get the information of the given solver
         Return : The solver information
@@ -85,7 +88,7 @@ class SatManager(Constants):
             'Glucose4', 'Lingeling', 'Maplechrono', 'Mergesat3'
             ]
 
-        self.problem_dict = {} # file_name : SatInformation
+        self.problem_dict = {} # file_name : SatProblem
 
 
     ## Getters
@@ -106,7 +109,7 @@ class SatManager(Constants):
         return self.__avail_solver_list
 
 
-    def get_solution(self, file_name, solver_name):
+    def get_solution(self, file_name, solver_name='Cadical'):
         """
         Brief : Check if the formula is solved or not
         Return : None if didn't try to solve, True if solved, False otherwise
@@ -142,53 +145,41 @@ class SatManager(Constants):
             self.load_file(file_name, folder)
 
 
-    def __limit_solve(self):
-        print('Time over, solving interrupted !')
-
-
-    def solve(
-        self, file_name=None, cnf=None, solver_name='Cadical',
-        time_limit=None
-        ):
+    def solve(self, file_name, folder=None, solver_name='Cadical', time_limit=None):
         """
         Brief : Solve a CNF with the given solver
         Return : None
         > file_name : The loaded file
-        > cnf = The CNF to solve
+        > folder : The name of the subfolder containing the DIMACS file
         > solver_name : The name of the solver to use
         > time_limit : The maximum time taken to solve before interruption
         """
-        # Threading at time_limit
-        if time_limit is not None :
-            thread_timer = threading.Timer(time_limit, self.__limit_solve)
-            thread_timer.start()
-        # Solve part
-        if file_name is None :
-            if cnf is not None :
-                with Solver(
-                    name=solver_name, bootstrap_with=cnf.clauses
-                    ) as solver :
-                    solver.solve()
-        else :
-            problem = self.problem_dict[file_name]
-            if solver_name not in problem.solver_dict :
-                problem.solver_dict[solver_name] = Solverinformation()
-            info = problem.solver_dict[solver_name]
-            if cnf is None :
-                cnf = problem.cnf
-            with Solver(
-                name=solver_name, bootstrap_with=cnf.clauses, use_timer=True
-                ) as solver :
-                info.solution = solver.solve()
-                info.model = solver.get_model()
-                info.time = solver.time()
+        problem = self.problem_dict[file_name]
+        if solver_name not in problem.solver_dict :
+            problem.solver_dict[solver_name] = Solverinformation()
+        info = problem.solver_dict[solver_name]
+        clauses = problem.cnf.clauses
+        solve_script = path.join('manager', 'processing.py')
+        file_path = build_path(self.get_data_path(), folder, file_name)
+        try:
+            process = subp.run(
+                [sys.executable, solve_script, solver_name, file_path, '-sat'],
+                capture_output=True, text=True, timeout=time_limit
+                )
+            out = process.stdout.split('\n')
+            print(out)
+            info.solution = ast.literal_eval(out[0])
+            info.model = ast.literal_eval(out[1])
+            info.time = float(out[2])
+        except subp.TimeoutExpired:
+            info.time = 'Timeout'
 
 
     def solve_folder(self, folder, solver_name='Cadical', time_limit=None):
         """
         Brief : Start solving an entire folder and set the time to proceed
         Return : None
-        > folder : The name of the folder from which to solve all SAT files
+        > folder : The name of the folder from which to solve all DIMACS files
         > solver_name : The name of the solve to use
         > time_limit : The maximum time taken to solve before interruption
         """
@@ -196,7 +187,7 @@ class SatManager(Constants):
         for file_name in listdir(folder_path) :
             file_path = path.join(folder_path, file_name)
             if path.isfile(file_path) :
-                self.solve(file_name=file_name, solver_name=solver_name)
+                self.solve(file_name=file_name, folder=folder, solver_name=solver_name)
 
 
     def __repr__(self):
@@ -227,5 +218,5 @@ def main():
             sat_manager.solve(file_name=file_name, solver_name=solver_name)
     print(sat_manager)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

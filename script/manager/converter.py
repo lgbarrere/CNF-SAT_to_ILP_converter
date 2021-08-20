@@ -14,11 +14,7 @@ import time
 
 import pulp
 
-from .utility import Constants
-from .utility import to_ilp_suffix
-from .utility import lines_from_file
-from .utility import split
-from .utility import build_path
+from .utility import Constants, to_ilp_suffix, lines_from_file, split, build_path
 
 
 class ILPFormula:
@@ -521,7 +517,7 @@ class PulpProblem:
 
 
     ## Getters
-    def get_solver_info(self, solver_name):
+    def get_solver_info(self, solver_name='PULP_CBC_CMD'):
         """
         Brief : Getter for the solver information (from its name)
         Return : The solver information
@@ -543,9 +539,11 @@ class PulpConverter(Converter):
     """
     Brief : Get an ILP instance to create its PuLP version
     """
-    def __init__(self, solver_list=pulp.listSolvers(onlyAvailable=True)):
+    def __init__(self):
         super().__init__()
-        self.__solver_list = solver_list
+        self.__avail_solver_dict = {}
+        for solver_name in pulp.listSolvers(onlyAvailable=True):
+            self.__avail_solver_dict[solver_name] = None
         self.__problem_dict = {}
 
 
@@ -564,10 +562,33 @@ class PulpConverter(Converter):
         Brief : Get the list of the available solvers
         Return : The solver list
         """
-        return self.__solver_list
+        return self.__avail_solver_dict.keys()
+
+
+
+    def get_solver_path(self, solver_name):
+        """
+        Brief : Get the path of a solver from its name
+        Return : The path in a string (if no path, return None)
+        note : The solver must
+        """
+        return self.__avail_solver_dict[solver_name]
 
 
     ## Methods
+    def add_solver(self, solver_name, solver_path):
+        model = pulp.LpProblem('Check_solver', pulp.LpMinimize)
+        model += pulp.LpVariable('v') == 1
+        try:
+            model.solve(pulp.getSolver(solver_name, path=solver_path))
+            self.__avail_solver_dict[solver_name] = solver_path
+        except pulp.apis.core.PulpSolverError:
+            lg.critical(
+                "The solver requested " + solver_name + \
+                " can\'t be used with the path " + solver_path
+                )
+
+
     def define_problem(self, file_name, name='NoName'):
         """
         Brief : Define the problem from a loaded ILP given by a file name
@@ -580,6 +601,13 @@ class PulpConverter(Converter):
             return False
         if file_name in self.__problem_dict :
             lg.warning("Problem already defined.")
+            # If a new solver has been registered, add it to this problem
+            pulp_problem = self.__problem_dict[file_name]
+            for solver_name in self.__avail_solver_dict.keys():
+                if solver_name not in pulp_problem.solver_dict:
+                    pulp_problem.solver_dict[solver_name] = SolverInformation(
+                        pulp.getSolver(solver_name), pulp.LpStatusNotSolved
+                        )
             return False
 
         pulp_problem = PulpProblem()
@@ -621,7 +649,7 @@ class PulpConverter(Converter):
             lowBound=1, upBound=1
             )
 
-        for solver_name in self.__solver_list :
+        for solver_name in self.__avail_solver_dict.keys() :
             pulp_problem.solver_dict[solver_name] = SolverInformation(
                 pulp.getSolver(solver_name), pulp.LpStatusNotSolved
                 )
@@ -648,7 +676,7 @@ class PulpConverter(Converter):
         lg.debug("Folder definition done !")
 
 
-    def solve(self, file_name, solver_name='PULP_CBC_CMD', time_limit=None):
+    def solve(self, file_name, solver_name='PULP_CBC_CMD', path=None, time_limit=None):
         """
         Brief : Solve a problem from its file name, updating its information
         Return : None
@@ -664,15 +692,17 @@ class PulpConverter(Converter):
             # If the solver is interrupted, consider the problem is unsolved
             try :
                 solver_info.status = pulp_problem.problem.solve(
-                    pulp.getSolver(solver_name, timeLimit=time_limit)
+                    pulp.getSolver(solver_name, path=path, timeLimit=time_limit)
                     )
             except pulp.apis.core.PulpSolverError :
                 lg.warning("Interrupted solver.")
                 solver_info.status = pulp.LpStatusNotSolved
-            solver_info.time = time.time() - start_time
+            if solver_info.status == pulp.LpStatusNotSolved:
+                solver_info.time = 'Timeout'
+            else:
+                solver_info.time = time.time() - start_time
         else :
             lg.warning("Undefined problem or already solved.")
-
 
 
     def solve_folder(
@@ -712,7 +742,7 @@ class PulpConverter(Converter):
         with open(file_path, 'w') as file:
             for (file_name, problem) in self.__problem_dict.items() :
                 file.write(f'File : {file_name}\n')
-                for solver_name in self.__solver_list :
+                for solver_name in self.__avail_solver_dict.keys() :
                     solver_info = problem.solver_dict[solver_name]
                     file.write(f'  Solver : {solver_name}')
                     file.write(f' | Status : {solver_info.get_status()}')

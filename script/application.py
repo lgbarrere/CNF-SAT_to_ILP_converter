@@ -14,6 +14,7 @@ from enum import Enum, auto
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pulp
 
 from manager.utility import Constants, path_tail
 from manager.sat import SatManager
@@ -85,7 +86,12 @@ class Histogram(Constants):
                 label_time_dict[problem_name] = {}
             for solver in self.sat_solver_list :
                 info = self.sat_manager.get_problem(file).get_solver_info(solver)
-                solver_time_dict[solver].append(round(info.get_time(), 2))
+                time = info.get_time()
+                if time != 'Timeout':
+                    time = round(time, 2)
+                else:
+                    time = 0
+                solver_time_dict[solver].append(time)
                 label_time_dict[problem_name][solver] = info.get_time()
 
         for file in self.ilp_file_list :
@@ -96,7 +102,12 @@ class Histogram(Constants):
                 label_time_dict[problem_name] = {}
             for solver in self.ilp_solver_list :
                 info = self.converter.get_problem(file).get_solver_info(solver)
-                solver_time_dict[solver].append(round(info.get_time(), 2))
+                time = info.get_time()
+                if time != 'Timeout':
+                    time = round(time, 2)
+                else:
+                    time = 0
+                solver_time_dict[solver].append(time)
                 label_time_dict[problem_name][solver] = info.get_time()
 
         label_time_len = len(label_time_dict)
@@ -180,6 +191,11 @@ class Application(Constants):
         window.geometry('1000x600')
         window.minsize(1000, 600)
         window.config(bg=self.bg_color)
+        # Locate solver (from extra window)
+        self.locate_solver = None
+        self.select_window = None
+        self.locate_var = tk.StringVar()
+        self.locate_var.set(pulp.listSolvers()[0])
         # Configurations
         self.radiobutton_var = tk.IntVar()
         self.radiobutton_var.set(1) # Set to dark theme
@@ -224,6 +240,8 @@ class Application(Constants):
         file_menu.add_command(label='Select DIMACS folder', command=self.get_dimacs_folder)
         file_menu.add_command(label='Select ILP file', command=self.get_ilp_files)
         file_menu.add_command(label='Select ILP folder', command=self.get_ilp_folder)
+        file_menu.add_separator()
+        file_menu.add_command(label='Locate ILP solver', command=self.ask_new_solver)
         file_menu.add_separator()
         file_menu.add_command(
             label='Clear ILP folder',
@@ -293,6 +311,13 @@ class Application(Constants):
         solver_frame.pack(side='left', fill='y', padx=20, ipadx=20)
 
 
+    def control_time(self):
+        if self.time_checkbox_var.get() == 0 :
+            self.widget_ref['spinbox_time'].config(state='disable')
+        else :
+            self.widget_ref['spinbox_time'].config(state='normal')
+
+
     def control_panel(self):
         """
         Brief : Create a panel to control solving options
@@ -314,15 +339,17 @@ class Application(Constants):
             activebackground=self.bg_color,
             activeforeground=self.fg_color,
             variable=self.time_checkbox_var, onvalue=1, offvalue=0,
+            command=self.control_time
             )
         self.widget_ref['check_time'] = check_time
         self.spinbox_time = tk.Spinbox(
             control_frame, font=(self.__FONT_THEME, 14), justify='right',
-            exportselection=0, from_=1, to=3600, increment=1, width=4
+            exportselection=0, from_=1, to=3600, increment=1, width=4,
+            disabledbackground='grey', disabledforeground='black', state='disable'
             )
         self.widget_ref['spinbox_time'] = self.spinbox_time
         label_time_unit = tk.Label(
-            control_frame, text='ms',
+            control_frame, text='s',
             font=(self.__FONT_THEME, 14), bg=self.bg_color,
             fg=self.fg_color
             )
@@ -338,7 +365,7 @@ class Application(Constants):
         control_frame.pack(side='bottom', fill='x', pady=40)
         check_time.pack(side='left', padx=10)
         self.spinbox_time.pack(side='left')
-        label_time_unit.pack(side='left', padx=(2, 0))
+        label_time_unit.pack(side='left')
         solve_button.pack(side='left', expand=True, padx=20)
 
 
@@ -514,11 +541,6 @@ class Application(Constants):
             bg='grey', fg=self.invert_fg_color, command=None
             )
         self.widget_ref['histogram_button'] = histogram_button
-        solution_button = tk.Button(
-            result_frame, text='S', font=(self.__FONT_THEME, 18),
-            bg='grey', fg=self.invert_fg_color, command=function_todo
-            )
-        self.widget_ref['solution_button'] = solution_button
         # Display
         result_frame.pack(side='right', fill='y', padx=20, ipadx=20)
         label_result.pack(pady=10)
@@ -526,8 +548,7 @@ class Application(Constants):
         output_frame.pack()
         label_output.pack(anchor='w')
         label_satus.pack(pady=5)
-        histogram_button.pack(side='left', anchor='n', pady=20, expand=True)
-        solution_button.pack(side='right', anchor='n', pady=20, expand=True)
+        histogram_button.pack(pady=20)
 
 
     def switch_theme(self):
@@ -617,6 +638,19 @@ class Application(Constants):
                 activebackground=self.bg_color,
                 activeforeground=self.fg_color
                 )
+        # Control panel
+        self.widget_ref['control_frame'].config(
+            bg=self.bg_color
+            )
+        self.widget_ref['check_time'].config(
+            bg=self.bg_color, fg=self.fg_color,
+            selectcolor=self.bg_color,
+            activebackground=self.bg_color,
+            activeforeground=self.fg_color
+            )
+        self.widget_ref['label_time_unit'].config(
+            bg=self.bg_color, fg=self.fg_color
+            )
         # Right component
         self.widget_ref['result_frame'].config(
             bg=self.bg_color,
@@ -675,7 +709,11 @@ class Application(Constants):
                 self.sat_manager.load_file(file_name, self.sat_folder)
             self.nb_dimacs = len(self.sat_file_tuple)
             self.update_selected_files()
-            self.widget_ref['label_output'].config(text='Files selected')
+            if len(file_tuple) == 1:
+                text = 'File selected :\n' + path_tail(file_tuple[0])
+                self.widget_ref['label_output'].config(text=text)
+            else:
+                self.widget_ref['label_output'].config(text='Files selected')
             self.widget_ref['label_satus'].config(text='Status :\nNone')
 
 
@@ -731,7 +769,11 @@ class Application(Constants):
                     )
             self.nb_ilp = len(self.ilp_file_tuple)
             self.update_selected_files()
-            self.widget_ref['label_output'].config(text='Files selected')
+            if len(file_tuple) == 1:
+                text = 'File selected :\n' + path_tail(file_tuple[0])
+                self.widget_ref['label_output'].config(text=text)
+            else:
+                self.widget_ref['label_output'].config(text='Files selected')
             self.widget_ref['label_satus'].config(text='Status :\nNone')
 
 
@@ -760,6 +802,106 @@ class Application(Constants):
         self.widget_ref['label_satus'].config(text='Status :\nNone')
 
 
+    def get_selected_solver(self):
+        for solver_name in pulp.listSolvers():
+            if self.locate_var.get() == solver_name:
+                self.locate_solver = solver_name
+        self.select_window.quit()
+        self.select_window.destroy()
+
+
+    def select_solver_window(self):
+        # Main
+        self.select_window = tk.Toplevel(self.widget_ref['window'])
+        # Center the window
+        windowWidth = self.select_window.winfo_reqwidth()
+        windowHeight = self.select_window.winfo_reqheight()
+        screenWidth = self.select_window.winfo_screenwidth()
+        screenHeight = self.select_window.winfo_screenheight()
+        rightPos = int((screenWidth - windowWidth) / 2)
+        downPos = int((screenHeight - windowHeight) / 2)
+        self.select_window.geometry('+{}+{}'.format(rightPos, downPos))
+
+        # Header
+        frame1 = tk.Frame(
+            self.select_window, highlightbackground='green', highlightcolor='green',
+            highlightthickness=1, bd=0
+            )
+        self.select_window.overrideredirect(1)
+        label = tk.Label(frame1, text='Select the solver to locate :')
+
+        # Solver selector
+        solver_list = pulp.listSolvers()
+        radiobutton_list = []
+
+        for solver_name in solver_list:
+            radiobutton_list.append(tk.Radiobutton(
+                self.select_window, text=solver_name,
+                variable=self.locate_var, value=solver_name
+                ))
+
+        # Validation button
+        ok_button = tk.Button(
+            frame1, text='OK', bg='light blue', fg='black',
+            command=self.get_selected_solver, width=10
+            )
+
+        # Display
+        frame1.pack()
+        label.pack()
+        for i in range(len(solver_list)):
+            radiobutton_list[i].pack(anchor='w')
+        ok_button.pack()
+
+        self.select_window.mainloop()
+
+
+    def ask_new_solver(self):
+        """
+        Brief : Ask the user to select a solver to locate from its path
+        Return : None
+        """
+        filetypes = (
+            ('All', '*.*'),
+            ('Windows app', '*.exe')
+            )
+
+        # Select a solver to locate
+        self.select_solver_window()
+
+        # Ask the path
+        if self.locate_solver is not None:
+            path_to_folder = self.converter.get_root_path()
+            executable_path = fd.askopenfilename(
+                parent=self.widget_ref['window'],
+                title='Locate solver\'s executable',
+                initialdir=path_to_folder, filetypes=filetypes
+                )
+            self.converter.add_solver(
+                self.locate_solver, executable_path
+                )
+            text = 'Solver ' + self.locate_solver + ' loaded'
+            self.widget_ref['label_output'].config(text=text)
+            self.widget_ref['label_satus'].config(text='Status :\nNone')
+
+            # Check-boxes
+            if self.locate_solver not in self.widget_ref:
+                ilp_var = tk.IntVar()
+                self.ilp_checkbox_var.append(ilp_var)
+                button = tk.Checkbutton(
+                    self.widget_ref['ilp_frame'], font=(self.__FONT_THEME, 14),
+                    text=self.locate_solver, bg=self.bg_color,
+                    fg=self.fg_color, bd=0,
+                    selectcolor=self.bg_color,
+                    activebackground=self.bg_color,
+                    activeforeground=self.fg_color,
+                    variable=ilp_var, onvalue=1, offvalue=0,
+                    )
+                self.widget_ref[self.locate_solver] = button
+                # Display
+                button.pack(anchor='w', padx=(10, 0))
+
+
     def convert_files(self):
         """
         Brief : Convert all DIMACS files into ILP files
@@ -776,9 +918,10 @@ class Application(Constants):
             for file in self.sat_file_tuple :
                 file = path_tail(file)
                 self.converter.convert_from_file(file, self.sat_folder)
-                self.converter.save_ilp_in_file(file, self.ilp_folder)
+                self.converter.save_ilp_in_file(file, self.sat_folder)
         # Update selected files
         self.ilp_file_tuple = self.sat_file_tuple
+        self.ilp_folder = self.sat_folder
         self.nb_ilp = self.nb_dimacs
         self.update_selected_files()
         self.widget_ref['label_output'].config(text='Files converted')
@@ -798,13 +941,12 @@ class Application(Constants):
                     self.converter.define_problem(file_name)
             else :
                 self.converter.define_problem_from_folder(self.ilp_folder)
-        self.widget_ref['label_output'].config(text='Solving')
-        self.widget_ref['label_satus'].config(text='Status :\nNone')
+        self.widget_ref['label_satus'].config(text='Status :\nSolving')
         self.widget_ref['window'].update()
         # Check time limit
         time_limit = None
         if self.time_checkbox_var.get() == 1 :
-            time_limit = self.spinbox_time.get()
+            time_limit = int(self.spinbox_time.get())
         solve_try = False
         sat_solver_list = []
         ilp_solver_list = []
@@ -817,18 +959,31 @@ class Application(Constants):
                     if self.sat_file_tuple :
                         for file in self.sat_file_tuple :
                             file = path_tail(file)
+                            text = 'Solving file ' + file + ' with ' + solver 
+                            self.widget_ref['label_output'].config(text=text)
+                            self.widget_ref['window'].update()
                             self.sat_manager.solve(
-                                file_name=file, solver_name=solver,
-                                time_limit=time_limit
+                                file_name=file, folder=self.sat_folder,
+                                solver_name=solver, time_limit=time_limit
                                 )
                             self.widget_ref['label_output'].config(
                                 text='Finished solving'
                                 )
                             problem = self.sat_manager.get_problem(file)
-                            solution = problem.get_solver_info(solver).get_solution()
-                            text = 'Status :\n' + str(solution)
+                            solver_info = problem.get_solver_info(solver)
+                            text = None
+                            time = solver_info.get_time()
+                            if time == 'Timeout':
+                                text = 'Status :\n' + time
+                            else:
+                                solution = solver_info.get_solution()
+                                text = 'Status :\n' + str(solution)
                             self.widget_ref['label_satus'].config(text=text)
                     else :
+                        text = 'Solving folder' + self.sat_folder + \
+                        ' with ' + solver 
+                        self.widget_ref['label_output'].config(text=text)
+                        self.widget_ref['window'].update()
                         self.sat_manager.solve_folder(
                             folder=self.sat_folder, solver_name=solver,
                             time_limit=time_limit
@@ -850,6 +1005,9 @@ class Application(Constants):
                     if self.ilp_file_tuple :
                         for file in self.ilp_file_tuple :
                             file = path_tail(file)
+                            text = 'Solving file ' + file + ' with ' + solver 
+                            self.widget_ref['label_output'].config(text=text)
+                            self.widget_ref['window'].update()
                             self.converter.solve(
                                 file, solver, time_limit=time_limit
                                 )
@@ -857,10 +1015,20 @@ class Application(Constants):
                                 text='Finished solving'
                                 )
                             problem = self.converter.get_problem(file)
-                            status = problem.get_solver_info(solver).get_status()
-                            text = 'Status :\n' + status
+                            solver_info = problem.get_solver_info(solver)
+                            text = None
+                            time = solver_info.get_time()
+                            if time == 'Timeout':
+                                text = 'Status :\n' + time
+                            else:
+                                status = problem.get_solver_info(solver).get_status()
+                                text = 'Status :\n' + status
                             self.widget_ref['label_satus'].config(text=text)
                     else :
+                        text = 'Solving folder ' + self.sat_folder + \
+                               ' with ' + solver
+                        self.widget_ref['label_output'].config(text=text)
+                        self.widget_ref['window'].update()
                         self.converter.solve_folder(
                             self.ilp_folder, solver, time_limit=time_limit
                             )
