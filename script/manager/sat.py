@@ -9,6 +9,7 @@ Brief : Read and solve DIMACS files with PySAT
 
 import sys
 import ast
+import os
 from os import path, listdir
 import subprocess as subp
 
@@ -88,7 +89,7 @@ class SatManager(Constants):
             'Glucose4', 'Lingeling', 'Maplechrono', 'Mergesat3'
             ]
 
-        self.problem_dict = {} # file_name : SatProblem
+        self.__problem_dict = {} # file_name : SatProblem
 
 
     ## Getters
@@ -98,7 +99,7 @@ class SatManager(Constants):
         Return : The problem
         > file_name : The loaded file
         """
-        return self.problem_dict[file_name]
+        return self.__problem_dict[file_name]
 
 
     def get_solvers(self) :
@@ -116,7 +117,7 @@ class SatManager(Constants):
         > file_name : The loaded file
         > solver_name : Name of the solver
         """
-        return self.problem_dict[file_name].solver_dict[solver_name].solution
+        return self.__problem_dict[file_name].solver_dict[solver_name].solution
 
 
     ## Methods
@@ -129,7 +130,7 @@ class SatManager(Constants):
         """
         file_path = build_path(self.get_data_path(), folder, file_name)
         if path.isfile(file_path) :
-            self.problem_dict[file_name] = SatProblem(
+            self.__problem_dict[file_name] = SatProblem(
                 cnf=CNF(from_file=file_path)
                 )
 
@@ -154,7 +155,7 @@ class SatManager(Constants):
         > solver_name : The name of the solver to use
         > time_limit : The maximum time taken to solve before interruption
         """
-        problem = self.problem_dict[file_name]
+        problem = self.__problem_dict[file_name]
         if solver_name not in problem.solver_dict :
             problem.solver_dict[solver_name] = Solverinformation()
         info = problem.solver_dict[solver_name]
@@ -167,7 +168,6 @@ class SatManager(Constants):
                 capture_output=True, text=True, timeout=time_limit
                 )
             out = process.stdout.split('\n')
-            print(out)
             info.solution = ast.literal_eval(out[0])
             info.model = ast.literal_eval(out[1])
             info.time = float(out[2])
@@ -190,10 +190,33 @@ class SatManager(Constants):
                 self.solve(file_name=file_name, folder=folder, solver_name=solver_name)
 
 
+    def save_results(self, result_file):
+        """
+        Brief : Save all solved SAT results in a file (created if missing)
+        Return : None
+        """
+        # If the file has been solved
+        folder = self.get_result_folder()
+        #lg.debug("Saving solutions in folder %s.", folder)
+        folder_path = path.join(self.get_root_path(), folder)
+        file_path = path.join(folder_path, result_file)
+        # Create folder and/or file if missing, then save the solutions
+        os.makedirs(folder_path, exist_ok=True)
+        with open(file_path, 'a') as file:
+            for (file_name, problem) in self.__problem_dict.items() :
+                file.write(f'File : {file_name}\n')
+                for solver_name in problem.solver_dict :
+                    solver_info = problem.solver_dict[solver_name]
+                    file.write(f'  Solver : {solver_name}')
+                    file.write(f' | Solution : {solver_info.solution}')
+                    file.write(f' | Execution time : {solver_info.time}\n')
+        #lg.debug("Solutions Saved !")
+
+
     def __repr__(self):
         text_list = []
-        for file_name in self.problem_dict :
-            info = self.problem_dict[file_name]
+        for file_name in self.__problem_dict :
+            info = self.__problem_dict[file_name]
             text_list.append('Problem : ' + file_name)
             text_list.append('  CNF : ' + str(info.cnf.clauses))
             tmp = []
@@ -212,7 +235,7 @@ def main():
     # Global test
     sat_manager = SatManager()
     sat_manager.load_folder()
-    for file_name in sat_manager.problem_dict :
+    for file_name in sat_manager.__problem_dict :
         print(file_name)
         for solver_name in sat_manager.get_solvers() :
             sat_manager.solve(file_name=file_name, solver_name=solver_name)

@@ -727,7 +727,7 @@ class PulpConverter(Converter):
         lg.debug("Folder solve done !")
 
 
-    def save_results(self):
+    def save_results(self, result_file):
         """
         Brief : Save all solved ILP results in a file (created if missing)
         Return : None
@@ -736,16 +736,16 @@ class PulpConverter(Converter):
         folder = self.get_result_folder()
         lg.debug("Saving solutions in folder %s.", folder)
         folder_path = path.join(self.get_root_path(), folder)
-        file_path = path.join(folder_path, self.get_result_file())
+        file_path = path.join(folder_path, result_file)
         # Create folder and/or file if missing, then save the solutions
         os.makedirs(folder_path, exist_ok=True)
-        with open(file_path, 'w') as file:
+        with open(file_path, 'a') as file:
             for (file_name, problem) in self.__problem_dict.items() :
                 file.write(f'File : {file_name}\n')
-                for solver_name in self.__avail_solver_dict.keys() :
+                for solver_name in problem.solver_dict :
                     solver_info = problem.solver_dict[solver_name]
                     file.write(f'  Solver : {solver_name}')
-                    file.write(f' | Status : {solver_info.get_status()}')
+                    file.write(f' | Status : {solver_info.status}')
                     file.write(f' | Execution time : {solver_info.time}\n')
         lg.debug("Solutions Saved !")
 

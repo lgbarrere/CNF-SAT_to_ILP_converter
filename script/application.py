@@ -8,6 +8,7 @@ Brief : Create an API for the converter
 """
 import os
 from os import path
+import datetime
 import tkinter as tk
 from tkinter import filedialog as fd
 from enum import Enum, auto
@@ -16,7 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pulp
 
-from manager.utility import Constants, path_tail
+from manager.utility import Constants, path_tail, lines_from_file
 from manager.sat import SatManager
 from manager.converter import PulpConverter
 
@@ -35,12 +36,6 @@ class Color(Enum):
     """
     ANTHRACITE = '#151515'
     LIGHT_GREY = '#E5E5E5'
-
-
-class ProblemData:
-    """
-    Brief : Define the data used by the application
-    """
 
 
 class Histogram(Constants):
@@ -199,6 +194,7 @@ class Application(Constants):
         # Configurations
         self.radiobutton_var = tk.IntVar()
         self.radiobutton_var.set(1) # Set to dark theme
+        self.load_config()
         self.sat_checkbox_var = []
         self.ilp_checkbox_var = []
         # Frames
@@ -208,6 +204,7 @@ class Application(Constants):
         self.widget_ref['header_frame'] = header_frame
         # Components
         self.create_widgets()
+        self.switch_theme()
 
 
     def create_widgets(self):
@@ -246,6 +243,10 @@ class Application(Constants):
         file_menu.add_command(
             label='Clear ILP folder',
             command=self.converter.clear_all_save_folder
+            )
+        file_menu.add_command(
+            label='Save configuration',
+            command=self.save_config
             )
         file_menu.add_separator()
         file_menu.add_command(
@@ -982,7 +983,10 @@ class Application(Constants):
                                 text = 'Status :\n' + str(solution)
                             self.widget_ref['label_satus'].config(text=text)
                     else :
-                        text = 'Solving folder' + self.sat_folder + \
+                        tmp_folder = self.sat_folder
+                        if tmp_folder is None:
+                            tmp_folder = self.get_data_folder()
+                        text = 'Solving folder' + tmp_folder + \
                         ' with ' + solver
                         self.widget_ref['label_output'].config(text=text)
                         self.widget_ref['window'].update()
@@ -1027,7 +1031,9 @@ class Application(Constants):
                                 text = 'Status :\n' + status
                             self.widget_ref['label_satus'].config(text=text)
                     else :
-                        text = 'Solving folder ' + self.sat_folder + \
+                        if tmp_folder is None:
+                            tmp_folder = self.get_save_folder()
+                        text = 'Solving folder ' + tmp_folder + \
                                ' with ' + solver
                         self.widget_ref['label_output'].config(text=text)
                         self.widget_ref['window'].update()
@@ -1075,13 +1081,67 @@ class Application(Constants):
             self.widget_ref['histogram_button'].config(
                 command=self.histogram.show
                 )
-            self.converter.save_results()
+            date = datetime.datetime.now()
+            current_date = f'{date.day}-{date.month}-{date.year}'
+            current_time = f'{date.hour}-{date.minute}-{date.second}'
+            result_file = f'result_{current_date}_{current_time}.sol'
+            self.sat_manager.save_results(result_file)
+            self.converter.save_results(result_file)
         else :
             self.widget_ref['label_output'].config(
                 text='No solver was selected'
                 )
             text = 'Status :\nNone'
             self.widget_ref['label_satus'].config(text=text)
+
+
+    def save_config(self):
+        """
+        Brief : Save configurations in a file (created if missing)
+        Return : None
+        """
+        folder = self.get_root_path()
+        file_name = 'loader.config'
+        file_path = path.join(folder, file_name)
+        with open(file_path, 'w') as file:
+            theme = self.radiobutton_var.get()
+            file.write('Theme :\n')
+            file.write(f'  {theme}\n')
+            file.write('Solvers :\n')
+            for solver_name in self.converter.get_solvers() :
+                solver_path = self.converter.get_solver_path(solver_name)
+                if solver_path is not None:
+                    file.write(f'  {solver_name} : {solver_path}\n')
+            file.write('End\n')
+
+
+
+    def load_config(self):
+        """
+        Brief : Load configurations from a file
+        Return : None
+        """
+        folder = self.get_root_path()
+        file_name = 'loader.config'
+        file_path = path.join(folder, file_name)
+        if not path.isfile(file_path):
+            return
+        lines = lines_from_file(file_path)
+        lines.append('EOF')
+        i = 0
+        while lines[i] != 'EOF':
+            if lines[i] == 'Theme :\n':
+                i += 1
+                self.radiobutton_var.set(int(lines[i].strip()))
+            if lines[i] == 'Solvers :\n':
+                i += 1
+                while lines[i] != 'End\n':
+                    solver_config = lines[i].split(' : ')
+                    solver_name = solver_config[0].strip()
+                    solver_path = solver_config[1].strip()
+                    self.converter.add_solver(solver_name, solver_path)
+                    i += 1
+            i += 1
 
 
 def files_from_folder(path_to_folder):
