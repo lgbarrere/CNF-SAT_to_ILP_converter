@@ -134,3 +134,4 @@ data/dimacs
 result/
 *.zip
 *.config
+tmp_test.py

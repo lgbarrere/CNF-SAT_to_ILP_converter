@@ -75,7 +75,7 @@ class Converter(Constants):
         super().__init__()
         self._formula_dict = {} # formula associated to a file name
         self.__ilp_string_dict = {} # string of ILP associated to a file name
-
+        self.__convert_time_dict = {}
 
     ## Getters
     def get_ilp_string(self, file_name):
@@ -94,6 +94,16 @@ class Converter(Constants):
         > file_name : Name of the DIMACS or ILP file concerned
         """
         return self._formula_dict[to_ilp_suffix(file_name)].converted
+
+
+
+    def get_convert_time(self, file_name):
+        """
+        Brief : Get the time spend to convert the file file_name
+        Return : The conversion time
+        > file_name : Name of the DIMACS or ILP file concerned
+        """
+        return self.__convert_time_dict[to_ilp_suffix(file_name)]
 
 
     def get_constraint(self, file_name):
@@ -189,6 +199,7 @@ class Converter(Constants):
         nb_clauses = 0
 
         # Process
+        start_time = time.time()
         for line in lines:
             words = line.split()
             # Ignore DIMACS comments
@@ -226,6 +237,7 @@ class Converter(Constants):
                 formula.constraint_dict[f'C{nb_clauses}'] = (word_list, goal)
         for binary in binary_dict.values() :
             formula.binary_list.append(binary)
+        self.__convert_time_dict[file_name] = time.time() - start_time
         formula.converted = True
 
 

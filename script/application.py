@@ -63,47 +63,75 @@ class Histogram(Constants):
         Return : None
         """
         # Initialisations
-        label_list = []
         solver_time_dict = {}
         label_time_dict = {}
+        solution_dict = {}
 
         for solver in self.sat_solver_list :
             solver_time_dict[solver] = []
 
         for solver in self.ilp_solver_list :
             solver_time_dict[solver] = []
-
+        
         for file in self.sat_file_list :
             file = path_tail(file)
             problem_name = path.splitext(file)[0]
-            if problem_name not in label_list :
-                label_list.append(problem_name)
+            if problem_name not in solution_dict:
                 label_time_dict[problem_name] = {}
             for solver in self.sat_solver_list :
                 info = self.sat_manager.get_problem(file).get_solver_info(solver)
                 time = info.get_time()
+                label_time_dict[problem_name][solver] = time
+
+                # Display if the formula is SAT/UNSAT/Unsolved
+                problem = self.sat_manager.get_problem(file)
+                solver_info = problem.get_solver_info(solver)
+                status = solver_info.get_solution()
+                label_unsolved = problem_name + '\nUnsolved'
+                if problem_name not in solution_dict \
+                   or solution_dict[problem_name] == label_unsolved:
+                    if status == True:
+                        solution_dict[problem_name] = problem_name + '\nSAT'
+                    elif status == False and time != 'Timeout':
+                        solution_dict[problem_name] = problem_name + '\nUNSAT'
+                    else:
+                        solution_dict[problem_name] = label_unsolved
+                
                 if time != 'Timeout':
                     time = round(time, 2)
                 else:
                     time = 0
                 solver_time_dict[solver].append(time)
-                label_time_dict[problem_name][solver] = info.get_time()
 
         for file in self.ilp_file_list :
             file = path_tail(file)
             problem_name = path.splitext(file)[0]
-            if problem_name not in label_list :
-                label_list.append(problem_name)
+            if problem_name not in solution_dict:
                 label_time_dict[problem_name] = {}
             for solver in self.ilp_solver_list :
                 info = self.converter.get_problem(file).get_solver_info(solver)
                 time = info.get_time()
+                label_time_dict[problem_name][solver] = time
+
+                # Display if the formula is SAT/UNSAT/Unsolved
+                problem = self.converter.get_problem(file)
+                solver_info = problem.get_solver_info(solver)
+                status = solver_info.get_status()
+                label_unsolved = problem_name + '\nUnsolved'
+                if problem_name not in solution_dict \
+                   or solution_dict[problem_name] == label_unsolved:
+                    if status == 'Optimal':
+                        solution_dict[problem_name] = problem_name + '\nSAT'
+                    elif status == 'Infeasible':
+                        solution_dict[problem_name] = problem_name + '\nUNSAT'
+                    else:
+                        solution_dict[problem_name] = label_unsolved
+
                 if time != 'Timeout':
                     time = round(time, 2)
                 else:
                     time = 0
                 solver_time_dict[solver].append(time)
-                label_time_dict[problem_name][solver] = info.get_time()
 
         label_time_len = len(label_time_dict)
         nb_sat_solvers = len(self.sat_solver_list)
@@ -121,11 +149,24 @@ class Histogram(Constants):
             i_list[solver] = []
 
         prob_num = 0
+        i = 0
         for problem_name in label_time_dict :
             tmp = 0
             for solver in label_time_dict[problem_name] :
                 nb_time = len(label_time_dict[problem_name])
                 i_list[solver].append(x_list[prob_num] + (tmp - ((nb_time - 1) / 2)) * width)
+                solver_time = label_time_dict[problem_name][solver]
+                y_text = 0
+                if solver_time != 'Timeout':
+                    solver_time = round(solver_time, 2)
+                    y_text = solver_time
+                text = f'{solver_time}'
+                plt.text(
+                    i_list[solver][prob_num],
+                    y_text,
+                    text, ha = 'center'
+                    )
+                i += 1
                 tmp += 1
             prob_num += 1
 
@@ -142,11 +183,8 @@ class Histogram(Constants):
         axis_x.set_ylabel(self.y_label)
         axis_x.set_title(self.title)
         axis_x.set_xticks(x_list)
-        axis_x.set_xticklabels(label_list)
+        axis_x.set_xticklabels(solution_dict.values())
         axis_x.legend()
-
-        for rect in rect_list :
-            axis_x.bar_label(rect)
 
         plt.show()
 
@@ -1027,7 +1065,7 @@ class Application(Constants):
                             if time == 'Timeout':
                                 text = 'Status :\n' + time
                             else:
-                                status = problem.get_solver_info(solver).get_status()
+                                status = solver_info.get_status()
                                 text = 'Status :\n' + status
                             self.widget_ref['label_satus'].config(text=text)
                     else :
