@@ -197,7 +197,6 @@ class SatManager(Constants):
         """
         # If the file has been solved
         folder = self.get_result_folder()
-        #lg.debug("Saving solutions in folder %s.", folder)
         folder_path = path.join(self.get_root_path(), folder)
         file_path = path.join(folder_path, result_file)
         # Create folder and/or file if missing, then save the solutions
@@ -210,7 +209,6 @@ class SatManager(Constants):
                     file.write(f'  Solver : {solver_name}')
                     file.write(f' | Solution : {solver_info.solution}')
                     file.write(f' | Execution time : {solver_info.time}\n')
-        #lg.debug("Solutions Saved !")
 
 
     def __repr__(self):

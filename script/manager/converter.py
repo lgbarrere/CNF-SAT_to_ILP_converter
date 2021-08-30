@@ -765,11 +765,15 @@ class PulpConverter(Converter):
         with open(file_path, 'a') as file:
             for (file_name, problem) in self.__problem_dict.items() :
                 file.write(f'File : {file_name}\n')
+                convert_time = self.get_convert_time(file_name)
+                file.write(f'  Conversion time : {convert_time}\n')
                 for solver_name in problem.solver_dict :
                     solver_info = problem.solver_dict[solver_name]
-                    file.write(f'  Solver : {solver_name}')
-                    file.write(f' | Status : {solver_info.status}')
-                    file.write(f' | Execution time : {solver_info.time}\n')
+                    if solver_info.status != pulp.LpStatusNotSolved \
+                       or solver_info.time != 0:
+                        file.write(f'  Solver : {solver_name}')
+                        file.write(f' | Status : {solver_info.get_status()}')
+                        file.write(f' | Execution time : {solver_info.time}\n')
         lg.debug("Solutions Saved !")
 
 
