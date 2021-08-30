@@ -42,13 +42,14 @@ class Histogram(Constants):
     """
     Brief : Create a histogram of the execution time for each solver
     """
+    __TITLE = 'Time elapsed on\nthe problems'
+    __X_LABEL = 'Solvers SAT & ILP'
+    __Y_LABEL = 'Execution & conversion time'
+
+
     def __init__(self, sat_manager, converter, sat_file_list, ilp_file_list,
                  sat_solver_list, ilp_solver_list):
         super().__init__()
-        self.title = 'Solver execution time'
-        self.x_label = 'Solver and ILP'
-        self.y_label = 'Execution time'
-        self.fig = None
         self.sat_manager = sat_manager
         self.converter = converter
         self.sat_file_list = sat_file_list
@@ -67,28 +68,32 @@ class Histogram(Constants):
         convert_time_dict = {}
         label_time_dict = {}
         solution_dict = {}
+        converted = False # Check if at least one file has been converted
 
-        for solver in self.sat_solver_list :
-            solver_time_dict[solver] = []
+        if self.sat_file_list:
+            for solver in self.sat_solver_list :
+                solver_time_dict[solver] = []
+                convert_time_dict[solver] = []
+        if self.ilp_file_list:
+            for solver in self.ilp_solver_list :
+                solver_time_dict[solver] = []
+                convert_time_dict[solver] = []
 
-        for solver in self.ilp_solver_list :
-            solver_time_dict[solver] = []
-            convert_time_dict[solver] = []
-        
+        # Set SAT features for the histogram
         for file in self.sat_file_list :
+            # Get the name of the file without path and extension
             file = path_tail(file)
             problem_name = path.splitext(file)[0]
             if problem_name not in solution_dict:
                 label_time_dict[problem_name] = {}
             for solver in self.sat_solver_list :
-                info = self.sat_manager.get_problem(file).get_solver_info(solver)
+                sat_problem = self.sat_manager.get_problem(file)
+                info = sat_problem.get_solver_info(solver)
                 time = info.get_time()
                 label_time_dict[problem_name][solver] = time
 
                 # Display if the formula is SAT/UNSAT/Unsolved
-                problem = self.sat_manager.get_problem(file)
-                solver_info = problem.get_solver_info(solver)
-                status = solver_info.get_solution()
+                status = info.get_solution()
                 label_unsolved = problem_name + '\nUnsolved'
                 if problem_name not in solution_dict \
                    or solution_dict[problem_name] == label_unsolved:
@@ -104,21 +109,22 @@ class Histogram(Constants):
                 else:
                     time = 0
                 solver_time_dict[solver].append(time)
+                convert_time_dict[solver].append(0)
 
+        # Set ILP features for the histogram
         for file in self.ilp_file_list :
             file = path_tail(file)
             problem_name = path.splitext(file)[0]
             if problem_name not in solution_dict:
                 label_time_dict[problem_name] = {}
             for solver in self.ilp_solver_list :
-                info = self.converter.get_problem(file).get_solver_info(solver)
+                ilp_problem = self.converter.get_problem(file)
+                info = ilp_problem.get_solver_info(solver)
                 time = info.get_time()
                 label_time_dict[problem_name][solver] = time
 
                 # Display if the formula is SAT/UNSAT/Unsolved
-                problem = self.converter.get_problem(file)
-                solver_info = problem.get_solver_info(solver)
-                status = solver_info.get_status()
+                status = info.get_status()
                 label_unsolved = problem_name + '\nUnsolved'
                 if problem_name not in solution_dict \
                    or solution_dict[problem_name] == label_unsolved:
@@ -139,6 +145,7 @@ class Histogram(Constants):
                     convert_time_dict[solver].append(0)
                 else:
                     convert_time_dict[solver].append(convert_time)
+                    converted = True
 
         label_time_len = len(label_time_dict)
         nb_sat_solvers = len(self.sat_solver_list)
@@ -147,7 +154,7 @@ class Histogram(Constants):
         width = 0.8/(nb_sat_solvers + nb_ilp_solvers)
 
         # Plot build
-        self.fig, axis_x = plt.subplots()
+        fig, axis_x = plt.subplots()
 
         # Calculus of positions
         i_list = {}
@@ -155,12 +162,13 @@ class Histogram(Constants):
             i_list[solver] = []
 
         prob_num = 0
-        i = 0
         for problem_name in label_time_dict :
-            tmp = 0
+            solver_num = 0
             for solver in label_time_dict[problem_name] :
                 nb_time = len(label_time_dict[problem_name])
-                i_list[solver].append(x_list[prob_num] + (tmp - ((nb_time - 1) / 2)) * width)
+                pos_list = x_list[prob_num] + \
+                           (solver_num - ((nb_time - 1) / 2)) * width
+                i_list[solver].append(pos_list)
                 solver_time = label_time_dict[problem_name][solver]
                 y_text = 0
                 if solver_time != 'Timeout':
@@ -174,45 +182,54 @@ class Histogram(Constants):
                     y_text,
                     text, ha = 'center'
                     )
-                i += 1
-                tmp += 1
+                solver_num += 1
             prob_num += 1
 
-        convert_solver_list = []
 
-        # Make bars
+        ## Make bars
+        if converted:
+            # Turn into single lists to make sure the conversion time
+            # has one color only in the legend
+            pos_list = []
+            convert_time_list = []
+            for solver in convert_time_dict:
+                for item in i_list[solver]:
+                    pos_list.append(item)
+                for item in convert_time_dict[solver]:
+                    convert_time_list.append(item)
+            # Conversion time bars
+            axis_x.bar(
+                pos_list, convert_time_list,
+                width, label='Conversion time'
+                )
+
+        # Execution time bars
         for solver in solver_time_dict :
-            nb_time = len(solver_time_dict[solver])
             if solver in i_list :
                 axis_x.bar(
                     i_list[solver], solver_time_dict[solver],
-                    width, label=solver
+                    width, label=solver, bottom=convert_time_dict[solver]
                     )
 
-        pos_list = []
-        convert_time_list = []
-        solver_time_list = []
-        for solver in convert_time_dict:
-            for item in i_list[solver]:
-                pos_list.append(item)
-            for item in convert_time_dict[solver]:
-                convert_time_list.append(item)
-            for item in solver_time_dict[solver]:
-                solver_time_list.append(item)
-        
-        axis_x.bar(
-            pos_list, convert_time_list,
-            width, label='Conversion time',
-            bottom=solver_time_list
+        # Add title, axis' texts, custom x-axis tick labels and a legend
+        axis_x.set_title(
+            self.__TITLE, fontsize=20, fontweight='bold',
+            color='darkred'
             )
-
-        # Add y-axis texts, title, custom x-axis tick labels and a legend
-        axis_x.set_ylabel(self.y_label)
-        axis_x.set_title(self.title)
+        axis_x.set_xlabel(
+            self.__X_LABEL, fontsize=14, fontweight='bold',
+            color='lightseagreen'
+            )
+        axis_x.set_ylabel(
+            self.__Y_LABEL, fontsize=14, fontweight='bold',
+            color='lightseagreen'
+            )
         axis_x.set_xticks(x_list)
         axis_x.set_xticklabels(solution_dict.values())
-        axis_x.legend()
+        plt.legend(loc='lower left', bbox_to_anchor=(0.8, 1))
 
+        plt.subplots_adjust(top=0.8)
+        fig.tight_layout()
         plt.show()
 
 
