@@ -100,10 +100,13 @@ class Converter(Constants):
     def get_convert_time(self, file_name):
         """
         Brief : Get the time spend to convert the file file_name
-        Return : The conversion time
+        Return : The conversion time if it exists, None otherwise
         > file_name : Name of the DIMACS or ILP file concerned
         """
-        return self.__convert_time_dict[to_ilp_suffix(file_name)]
+        file_name = to_ilp_suffix(file_name)
+        if file_name in self.__convert_time_dict:
+            return self.__convert_time_dict[file_name]
+        return None
 
 
     def get_constraint(self, file_name):
@@ -582,23 +585,31 @@ class PulpConverter(Converter):
         """
         Brief : Get the path of a solver from its name
         Return : The path in a string (if no path, return None)
-        note : The solver must
+        > solver_name : The name of the solver
         """
         return self.__avail_solver_dict[solver_name]
 
 
     ## Methods
     def add_solver(self, solver_name, solver_path):
+        """
+        Brief : Check if a solver can be used with the given path, then add it
+        Return : True if the solver is added, False otherwise
+        > solver_name : The name of the solver
+        > solver_path : The path to the executable of the solver
+        """
         model = pulp.LpProblem('Check_solver', pulp.LpMinimize)
         model += pulp.LpVariable('v') == 1
         try:
             model.solve(pulp.getSolver(solver_name, path=solver_path))
             self.__avail_solver_dict[solver_name] = solver_path
+            return True
         except pulp.apis.core.PulpSolverError:
             lg.critical(
                 "The solver requested " + solver_name + \
                 " can\'t be used with the path " + solver_path
                 )
+        return False
 
 
     def define_problem(self, file_name, name='NoName'):

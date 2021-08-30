@@ -64,6 +64,7 @@ class Histogram(Constants):
         """
         # Initialisations
         solver_time_dict = {}
+        convert_time_dict = {}
         label_time_dict = {}
         solution_dict = {}
 
@@ -72,6 +73,7 @@ class Histogram(Constants):
 
         for solver in self.ilp_solver_list :
             solver_time_dict[solver] = []
+            convert_time_dict[solver] = []
         
         for file in self.sat_file_list :
             file = path_tail(file)
@@ -132,6 +134,11 @@ class Histogram(Constants):
                 else:
                     time = 0
                 solver_time_dict[solver].append(time)
+                convert_time = self.converter.get_convert_time(file)
+                if convert_time is None:
+                    convert_time_dict[solver].append(0)
+                else:
+                    convert_time_dict[solver].append(convert_time)
 
         label_time_len = len(label_time_dict)
         nb_sat_solvers = len(self.sat_solver_list)
@@ -141,7 +148,6 @@ class Histogram(Constants):
 
         # Plot build
         self.fig, axis_x = plt.subplots()
-        rect_list = []
 
         # Calculus of positions
         i_list = {}
@@ -160,6 +166,8 @@ class Histogram(Constants):
                 if solver_time != 'Timeout':
                     solver_time = round(solver_time, 2)
                     y_text = solver_time
+                if solver in convert_time_dict:
+                    y_text += convert_time_dict[solver][prob_num]
                 text = f'{solver_time}'
                 plt.text(
                     i_list[solver][prob_num],
@@ -170,14 +178,33 @@ class Histogram(Constants):
                 tmp += 1
             prob_num += 1
 
+        convert_solver_list = []
+
         # Make bars
         for solver in solver_time_dict :
             nb_time = len(solver_time_dict[solver])
             if solver in i_list :
-                rect = axis_x.bar(
-                    i_list[solver], solver_time_dict[solver], width, label=solver
+                axis_x.bar(
+                    i_list[solver], solver_time_dict[solver],
+                    width, label=solver
                     )
-                rect_list.append(rect)
+
+        pos_list = []
+        convert_time_list = []
+        solver_time_list = []
+        for solver in convert_time_dict:
+            for item in i_list[solver]:
+                pos_list.append(item)
+            for item in convert_time_dict[solver]:
+                convert_time_list.append(item)
+            for item in solver_time_dict[solver]:
+                solver_time_list.append(item)
+        
+        axis_x.bar(
+            pos_list, convert_time_list,
+            width, label='Conversion time',
+            bottom=solver_time_list
+            )
 
         # Add y-axis texts, title, custom x-axis tick labels and a legend
         axis_x.set_ylabel(self.y_label)
@@ -854,22 +881,12 @@ class Application(Constants):
     def select_solver_window(self):
         # Main
         self.select_window = tk.Toplevel(self.widget_ref['window'])
-        # Center the window
-        windowWidth = self.select_window.winfo_reqwidth()
-        windowHeight = self.select_window.winfo_reqheight()
-        screenWidth = self.select_window.winfo_screenwidth()
-        screenHeight = self.select_window.winfo_screenheight()
-        rightPos = int((screenWidth - windowWidth) / 2)
-        downPos = int((screenHeight - windowHeight) / 2)
-        self.select_window.geometry('+{}+{}'.format(rightPos, downPos))
+
+        
 
         # Header
-        frame1 = tk.Frame(
-            self.select_window, highlightbackground='green', highlightcolor='green',
-            highlightthickness=1, bd=0
-            )
-        self.select_window.overrideredirect(1)
-        label = tk.Label(frame1, text='Select the solver to locate :')
+        #self.select_window.overrideredirect(1)
+        label = tk.Label(self.select_window, text='Select the solver to locate :')
 
         # Solver selector
         solver_list = pulp.listSolvers()
@@ -883,16 +900,27 @@ class Application(Constants):
 
         # Validation button
         ok_button = tk.Button(
-            frame1, text='OK', bg='light blue', fg='black',
+            self.select_window, text='OK', bg='light blue', fg='black',
             command=self.get_selected_solver, width=10
             )
 
         # Display
-        frame1.pack()
-        label.pack()
+        label.pack(pady=10)
         for i in range(len(solver_list)):
-            radiobutton_list[i].pack(anchor='w')
-        ok_button.pack()
+            radiobutton_list[i].pack(anchor='w', padx=20)
+        ok_button.pack(pady=10)
+
+        # Center the toplevel window
+        self.select_window.update()
+        windowWidth = 300
+        windowHeight = self.select_window.winfo_reqheight()
+        screenWidth = self.select_window.winfo_screenwidth()
+        screenHeight = self.select_window.winfo_screenheight()
+        rightPos = int((screenWidth - windowWidth) / 2)
+        downPos = int((screenHeight - windowHeight) / 2)
+        self.select_window.geometry('{}x{}+{}+{}'.format(
+            windowWidth, windowHeight, rightPos, downPos
+            ))
 
         self.select_window.mainloop()
 
@@ -918,9 +946,13 @@ class Application(Constants):
                 title='Locate solver\'s executable',
                 initialdir=path_to_folder, filetypes=filetypes
                 )
-            self.converter.add_solver(
+            if executable_path == '':
+                return
+            check_add = self.converter.add_solver(
                 self.locate_solver, executable_path
                 )
+            if not check_add:
+                return
             text = 'Solver ' + self.locate_solver + ' loaded'
             self.widget_ref['label_output'].config(text=text)
             self.widget_ref['label_satus'].config(text='Status :\nNone')
@@ -1018,7 +1050,13 @@ class Application(Constants):
                                 text = 'Status :\n' + time
                             else:
                                 solution = solver_info.get_solution()
-                                text = 'Status :\n' + str(solution)
+                                if solution == True:
+                                    solution = 'SAT'
+                                elif solution == False:
+                                    solution = 'UNSAT'
+                                else:
+                                    solution = 'Unsolved'
+                                text = 'Status :\n' + solution
                             self.widget_ref['label_satus'].config(text=text)
                     else :
                         tmp_folder = self.sat_folder
@@ -1066,6 +1104,12 @@ class Application(Constants):
                                 text = 'Status :\n' + time
                             else:
                                 status = solver_info.get_status()
+                                if status == 'Optimal':
+                                    status = 'SAT'
+                                elif status == 'Infeasible':
+                                    status = 'UNSAT'
+                                else:
+                                    status = 'Unsolved'
                                 text = 'Status :\n' + status
                             self.widget_ref['label_satus'].config(text=text)
                     else :
