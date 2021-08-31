@@ -711,19 +711,20 @@ class PulpConverter(Converter):
         pulp_problem = self.__problem_dict[file_name]
         solver_info = pulp_problem.solver_dict[solver_name]
         if not solver_info.is_solved() :
-            start_time = time.time()
             # If the solver is interrupted, consider the problem is unsolved
             try :
+                start_time = time.time()
                 solver_info.status = pulp_problem.problem.solve(
                     pulp.getSolver(solver_name, path=path, timeLimit=time_limit)
                     )
+                if solver_info.status == pulp.LpStatusNotSolved:
+                    solver_info.time = 'Timeout'
+                else:
+                    solver_info.time = time.time() - start_time
             except pulp.apis.core.PulpSolverError :
                 lg.warning("Interrupted solver.")
                 solver_info.status = pulp.LpStatusNotSolved
-            if solver_info.status == pulp.LpStatusNotSolved:
-                solver_info.time = 'Timeout'
-            else:
-                solver_info.time = time.time() - start_time
+                solver_info.time = 'Stopped'
         else :
             lg.warning("Undefined problem or already solved.")
 

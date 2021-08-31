@@ -99,12 +99,13 @@ class Histogram(Constants):
                    or solution_dict[problem_name] == label_unsolved:
                     if status == True:
                         solution_dict[problem_name] = problem_name + '\nSAT'
-                    elif status == False and time != 'Timeout':
+                    elif status == False and time != 'Timeout' \
+                         and time != 'Stopped':
                         solution_dict[problem_name] = problem_name + '\nUNSAT'
                     else:
                         solution_dict[problem_name] = label_unsolved
                 
-                if time != 'Timeout':
+                if time != 'Timeout' and time != 'Stopped':
                     time = round(time, 2)
                 else:
                     time = 0
@@ -135,7 +136,7 @@ class Histogram(Constants):
                     else:
                         solution_dict[problem_name] = label_unsolved
 
-                if time != 'Timeout':
+                if time != 'Timeout' and time != 'Stopped':
                     time = round(time, 2)
                 else:
                     time = 0
@@ -171,7 +172,7 @@ class Histogram(Constants):
                 i_list[solver].append(pos_list)
                 solver_time = label_time_dict[problem_name][solver]
                 y_text = 0
-                if solver_time != 'Timeout':
+                if solver_time != 'Timeout' and solver_time != 'Stopped':
                     solver_time = round(solver_time, 2)
                     y_text = solver_time
                 if solver in convert_time_dict:
