@@ -73,9 +73,9 @@ class Converter(Constants):
     """
     def __init__(self):
         super().__init__()
-        self._formula_dict = {} # formula associated to a file name
-        self.__ilp_string_dict = {} # string of ILP associated to a file name
-        self.__convert_time_dict = {}
+        self._formula_dict = {} # Formula associated to a file name
+        self.__ilp_string_dict = {} # String of ILP associated to a file name
+        self.__convert_time_dict = {} # Conversion time associated to a file name
 
     ## Getters
     def get_ilp_string(self, file_name):

@@ -194,6 +194,7 @@ class SatManager(Constants):
         """
         Brief : Save all solved SAT results in a file (created if missing)
         Return : None
+        > result_file : Name of the file to save the results
         """
         # If the file has been solved
         folder = self.get_result_folder()

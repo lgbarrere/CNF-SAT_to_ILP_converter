@@ -163,7 +163,7 @@ class Histogram(Constants):
             i_list[solver] = []
 
         prob_num = 0
-        for problem_name in label_time_dict :
+        for problem_name in label_time_dict:
             solver_num = 0
             for solver in label_time_dict[problem_name] :
                 nb_time = len(label_time_dict[problem_name])
@@ -176,16 +176,13 @@ class Histogram(Constants):
                     solver_time = round(solver_time, 2)
                     y_text = solver_time
                 if solver in convert_time_dict:
-                    y_text += convert_time_dict[solver][prob_num]
+                    y_text += convert_time_dict[solver][len(i_list[solver])-1]
                 text = f'{solver_time}'
                 plt.text(
-                    i_list[solver][prob_num],
-                    y_text,
-                    text, ha = 'center'
+                    i_list[solver][-1], y_text, text, ha = 'center'
                     )
                 solver_num += 1
             prob_num += 1
-
 
         ## Make bars
         if converted:
@@ -396,6 +393,10 @@ class Application(Constants):
 
 
     def control_time(self):
+        """
+        Brief : Enable or disable the spinbox time depending of its checkbox
+        Return : None
+        """
         if self.time_checkbox_var.get() == 0 :
             self.widget_ref['spinbox_time'].config(state='disable')
         else :
@@ -889,6 +890,10 @@ class Application(Constants):
 
 
     def get_selected_solver(self):
+        """
+        Brief : Get the selected solver from the extra window
+        Return : None
+        """
         for solver_name in pulp.listSolvers():
             if self.locate_var.get() == solver_name:
                 self.locate_solver = solver_name
@@ -897,13 +902,14 @@ class Application(Constants):
 
 
     def select_solver_window(self):
+        """
+        Brief : Create an extra window to select a solver to configure
+        Return : None
+        """
         # Main
         self.select_window = tk.Toplevel(self.widget_ref['window'])
 
-        
-
         # Header
-        #self.select_window.overrideredirect(1)
         label = tk.Label(self.select_window, text='Select the solver to locate :')
 
         # Solver selector
