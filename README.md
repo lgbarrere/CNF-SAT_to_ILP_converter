@@ -37,7 +37,7 @@ Every new loads overwrite the previous ones.
 
 * **Adding solvers**
 
-In the "File" menu bar, the "Locate ILP solver" option allows to choose a PuLP solver from its database and configure it from its given path, you must know where is the executable of the solver in your computer to use this option.
+In the "File" menu bar, the "Locate ILP solver" option allows to choose a PuLP solver from its database and configure it from its given path, you must know where is the executable of the solver in your computer to use this option. Be aware, adding a new path to an already configured solver will erase the previous path (only works if the new path is considered correct).
 
 * **Solver selection**
 
